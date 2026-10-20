@@ -61,8 +61,8 @@ jobs:
 
       - name: Test domain and application
         run: |
-          dotnet test tests/BlazorMultihostStarter.Domain.Tests/BlazorMultihostStarter.Domain.Tests.csproj --configuration Release --no-build --no-restore
-          dotnet test tests/BlazorMultihostStarter.Application.Tests/BlazorMultihostStarter.Application.Tests.csproj --configuration Release --no-build --no-restore
+          dotnet test tests/BlazorMultihostStarter.Domain.Tests/BlazorMultihostStarter.Domain.Tests.csproj --configuration Release
+          dotnet test tests/BlazorMultihostStarter.Application.Tests/BlazorMultihostStarter.Application.Tests.csproj --configuration Release
 
       - name: Test API against PostgreSQL
         run: dotnet test tests/BlazorMultihostStarter.Api.IntegrationTests/BlazorMultihostStarter.Api.IntegrationTests.csproj --configuration Release
@@ -70,7 +70,7 @@ jobs:
           TEST_POSTGRES_CONNECTION: Host=localhost;Port=5432;Database=blazor_multihost_starter;Username=starter;Password=starter_dev_password
 
       - name: Test shared Razor components
-        run: dotnet test tests/BlazorMultihostStarter.Shared.Tests/BlazorMultihostStarter.Shared.Tests.csproj --configuration Release --no-build --no-restore
+        run: dotnet test tests/BlazorMultihostStarter.Shared.Tests/BlazorMultihostStarter.Shared.Tests.csproj --configuration Release
 
   maui-windows:
     name: MAUI Windows build
