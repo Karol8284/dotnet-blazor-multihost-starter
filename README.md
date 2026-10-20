@@ -22,6 +22,8 @@ that share one Razor UI library and call the same API.
 The Web interactivity decision is recorded in
 [ADR-0001](./docs/adr/0001-web-interactivity.md). The implementation uses
 Interactive WebAssembly because the browser and MAUI app are both API clients.
+The shared screen appears after the WebAssembly client starts; the server does
+not prerender the Tasks page.
 
 ## Prerequisites
 
