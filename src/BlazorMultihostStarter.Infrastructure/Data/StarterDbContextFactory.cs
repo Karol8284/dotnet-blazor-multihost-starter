@@ -9,7 +9,7 @@ public sealed class StarterDbContextFactory : IDesignTimeDbContextFactory<Starte
     {
         var connectionString =
             Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-            ?? "Host=localhost;Port=5432;Database=blazor_multihost_starter;Username=starter;Password=starter_dev_password";
+            ?? "Host=localhost;Port=5433;Database=blazor_multihost_starter;Username=starter;Password=starter_dev_password";
 
         var options = new DbContextOptionsBuilder<StarterDbContext>()
             .UseNpgsql(connectionString)

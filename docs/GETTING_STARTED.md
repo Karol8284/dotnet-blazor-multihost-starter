@@ -23,8 +23,10 @@ docker compose up -d --wait postgres
 ```
 
 The committed development connection string matches the sample Compose
-credentials. They are disposable local-development values, not production
-secrets. Do not reuse them outside a local machine.
+credentials and connects to host port `5433` (the container listens on `5432`).
+Port `5433` avoids conflicting with a PostgreSQL server already listening on
+the host's default port. The credentials are disposable local-development
+values, not production secrets. Do not reuse them outside a local machine.
 
 ## Apply migrations and run Web/API
 

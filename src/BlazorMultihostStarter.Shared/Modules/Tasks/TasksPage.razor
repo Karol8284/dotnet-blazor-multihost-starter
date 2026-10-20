@@ -1,4 +1,5 @@
 ﻿@page "/"
+@using System.Net
 @inject ITasksApiClient TasksApiClient
 
 <PageTitle>Tasks | Blazor Multihost Starter</PageTitle>
@@ -94,9 +95,9 @@
         {
             _tasks = await TasksApiClient.ListAsync();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException exception)
         {
-            _errorMessage = "The API is unavailable. Start the Web host and try again.";
+            _errorMessage = DescribeApiFailure(exception);
         }
         finally
         {
@@ -125,9 +126,9 @@
         {
             _errorMessage = exception.Message;
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException exception)
         {
-            _errorMessage = "The task could not be saved. Check the API connection and try again.";
+            _errorMessage = $"The task could not be saved. {DescribeApiFailure(exception)}";
         }
         finally
         {
@@ -146,9 +147,29 @@
                 .Select(task => task.Id == id ? completedTask : task)
                 .ToArray();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException exception)
         {
-            _errorMessage = "The task could not be updated. Check the API connection and try again.";
+            _errorMessage = $"The task could not be updated. {DescribeApiFailure(exception)}";
         }
+    }
+
+    private static string DescribeApiFailure(HttpRequestException exception)
+    {
+        if (exception.StatusCode is not { } statusCode)
+        {
+            return "The API host could not be reached. Start the Web host and retry.";
+        }
+
+        if (statusCode == HttpStatusCode.NotFound)
+        {
+            return "The task no longer exists. Refresh the list and try again.";
+        }
+
+        if ((int)statusCode >= 500)
+        {
+            return $"The API returned HTTP {(int)statusCode}. Check the Web host logs and PostgreSQL connection settings.";
+        }
+
+        return $"The API returned HTTP {(int)statusCode}. Check the request and try again.";
     }
 }
