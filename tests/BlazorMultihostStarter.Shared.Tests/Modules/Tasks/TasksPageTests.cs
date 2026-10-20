@@ -30,8 +30,21 @@ public sealed class TasksPageTests
 
         var cut = context.Render<TasksPage>();
 
-        cut.WaitForAssertion(() => Assert.Contains("The API is unavailable", cut.Markup));
+        cut.WaitForAssertion(() => Assert.Contains("The API host could not be reached", cut.Markup));
         Assert.Contains("Try again", cut.Markup);
+    }
+
+    [Fact]
+    public void Explains_server_errors_instead_of_suggesting_the_host_is_offline()
+    {
+        using var context = new BunitContext();
+        context.Services.AddSingleton<ITasksApiClient>(
+            new FakeTasksApiClient(failureStatus: HttpStatusCode.InternalServerError));
+
+        var cut = context.Render<TasksPage>();
+
+        cut.WaitForAssertion(() => Assert.Contains("HTTP 500", cut.Markup));
+        Assert.Contains("PostgreSQL connection settings", cut.Markup);
     }
 
     [Fact]
@@ -62,12 +75,19 @@ public sealed class TasksPageTests
         Assert.DoesNotContain(references, name => name?.StartsWith("BlazorMultihostStarter.Web", StringComparison.Ordinal) == true);
     }
 
-    private sealed class FakeTasksApiClient(bool failRequests = false) : ITasksApiClient
+    private sealed class FakeTasksApiClient(
+        bool failRequests = false,
+        HttpStatusCode? failureStatus = null) : ITasksApiClient
     {
         public List<TaskResponse> Tasks { get; } = [];
 
         public Task<IReadOnlyList<TaskResponse>> ListAsync(CancellationToken cancellationToken = default)
         {
+            if (failureStatus is { } statusCode)
+            {
+                throw new HttpRequestException("API request failed.", null, statusCode);
+            }
+
             if (failRequests)
             {
                 throw new HttpRequestException("API unavailable.");

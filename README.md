@@ -54,7 +54,9 @@ dotnet run --project .\src\BlazorMultihostStarter.Web
 ```
 
 Open `http://localhost:5080`. The development HTTP profile listens on all
-interfaces so an Android emulator can reach the API; use the browser-facing
+interfaces so an Android emulator can reach the API. The project PostgreSQL
+container is exposed on host port `5433` so it can coexist with a local
+PostgreSQL server on `5432`; use the browser-facing
 `localhost` URL on the development machine. The WebAssembly client and `/api/tasks`
 are served by the same Web host, so local Web development doesn't require
 separate CORS configuration. In Development, the OpenAPI document is available
