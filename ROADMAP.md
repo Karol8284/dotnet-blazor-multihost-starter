@@ -1,8 +1,8 @@
 # Roadmap: dotnet-blazor-multihost-starter
 
 **Status:** implementacja V1 gotowa do review na branchu
-`feature/v1-blazor-multihost`; zdalny CI i ręczne uruchomienie obu hostów
-pozostają do potwierdzenia.
+`feature/v1-blazor-multihost`; CI przeszedł, pełny runtime smoke test obu hostów
+pozostaje do wykonania.
 **Data punktu odniesienia:** 2026-10-20
 
 ## Aktualny dowód realizacji V1
@@ -16,9 +16,11 @@ pozostają do potwierdzenia.
   interaktywnych, aby pobieranie danych rozpoczynało się w kliencie.
 - Lokalnie potwierdzono kompilację Release całej solution, build MAUI Windows
   Release i Android Debug, formatowanie C# oraz 22 testy w czterech projektach.
+- [GitHub Actions CI](https://github.com/Karol8284/dotnet-blazor-multihost-starter/actions/runs/39484501308)
+  przeszedł na commicie `56d65ee`: build Web, testy, testy API z migracją na
+  PostgreSQL service oraz build MAUI Windows Release.
 - Testy API uruchomiono lokalnie na SQLite in-memory. Lokalny Docker nie był
-  dostępny, więc nie ma jeszcze lokalnego dowodu migracji/flow na PostgreSQL;
-  workflow CI zawiera PostgreSQL service i sprawdza migrację.
+  dostępny; potwierdzenie na PostgreSQL pochodzi z GitHub Actions CI.
 - Pełny runtime smoke test w przeglądarce i w uruchomionej aplikacji MAUI nie
   został wykonany. Kompilacja obu hostów i API/component tests nie zastępują
   takiego sprawdzenia.
