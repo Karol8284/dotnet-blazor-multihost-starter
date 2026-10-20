@@ -1,0 +1,14 @@
+* text=auto
+*.cs text eol=crlf
+*.razor text eol=crlf
+*.csproj text eol=crlf
+*.props text eol=crlf
+*.targets text eol=crlf
+*.json text eol=crlf
+*.yml text eol=crlf
+*.yaml text eol=crlf
+*.md text eol=crlf
+*.png binary
+*.ico binary
+*.woff binary
+*.ttf binary
