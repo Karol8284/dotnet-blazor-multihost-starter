@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BlazorMultihostStarter.Web.Client\BlazorMultihostStarter.Web.Client.csproj" />
+    <ProjectReference Include="..\BlazorMultihostStarter.Shared\BlazorMultihostStarter.Shared.csproj" />
+    <ProjectReference Include="..\BlazorMultihostStarter.Application\BlazorMultihostStarter.Application.csproj" />
+    <ProjectReference Include="..\BlazorMultihostStarter.Contracts\BlazorMultihostStarter.Contracts.csproj" />
+    <ProjectReference Include="..\BlazorMultihostStarter.Infrastructure\BlazorMultihostStarter.Infrastructure.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+  </ItemGroup>
+
+</Project>

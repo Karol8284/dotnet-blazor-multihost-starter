@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-and-tests:
+    name: Web build and tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: blazor_multihost_starter
+          POSTGRES_USER: starter
+          POSTGRES_PASSWORD: starter_dev_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U starter -d blazor_multihost_starter"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.402
+
+      - name: Restore Web and test dependencies
+        run: |
+          dotnet tool restore
+          dotnet restore src/BlazorMultihostStarter.Web/BlazorMultihostStarter.Web.csproj
+          dotnet restore tests/BlazorMultihostStarter.Domain.Tests/BlazorMultihostStarter.Domain.Tests.csproj
+          dotnet restore tests/BlazorMultihostStarter.Application.Tests/BlazorMultihostStarter.Application.Tests.csproj
+          dotnet restore tests/BlazorMultihostStarter.Api.IntegrationTests/BlazorMultihostStarter.Api.IntegrationTests.csproj
+          dotnet restore tests/BlazorMultihostStarter.Shared.Tests/BlazorMultihostStarter.Shared.Tests.csproj
+
+      - name: Build Web host
+        run: dotnet build src/BlazorMultihostStarter.Web/BlazorMultihostStarter.Web.csproj --configuration Release --no-restore
+
+      - name: Check EF Core migration model
+        run: dotnet ef migrations has-pending-model-changes --project src/BlazorMultihostStarter.Infrastructure/BlazorMultihostStarter.Infrastructure.csproj --startup-project src/BlazorMultihostStarter.Web/BlazorMultihostStarter.Web.csproj --context BlazorMultihostStarter.Infrastructure.Data.StarterDbContext
+
+      - name: Test domain and application
+        run: |
+          dotnet test tests/BlazorMultihostStarter.Domain.Tests/BlazorMultihostStarter.Domain.Tests.csproj --configuration Release --no-build --no-restore
+          dotnet test tests/BlazorMultihostStarter.Application.Tests/BlazorMultihostStarter.Application.Tests.csproj --configuration Release --no-build --no-restore
+
+      - name: Test API against PostgreSQL
+        run: dotnet test tests/BlazorMultihostStarter.Api.IntegrationTests/BlazorMultihostStarter.Api.IntegrationTests.csproj --configuration Release
+        env:
+          TEST_POSTGRES_CONNECTION: Host=localhost;Port=5432;Database=blazor_multihost_starter;Username=starter;Password=starter_dev_password
+
+      - name: Test shared Razor components
+        run: dotnet test tests/BlazorMultihostStarter.Shared.Tests/BlazorMultihostStarter.Shared.Tests.csproj --configuration Release --no-build --no-restore
+
+  maui-windows:
+    name: MAUI Windows build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.402
+
+      - name: Restore MAUI workloads
+        run: dotnet workload restore src/BlazorMultihostStarter.Maui/BlazorMultihostStarter.Maui.csproj
+
+      - name: Build MAUI Windows target
+        run: dotnet build src/BlazorMultihostStarter.Maui/BlazorMultihostStarter.Maui.csproj --framework net10.0-windows10.0.19041.0 --configuration Release

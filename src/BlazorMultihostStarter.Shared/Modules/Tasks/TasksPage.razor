@@ -1,0 +1,154 @@
+﻿@page "/"
+@inject ITasksApiClient TasksApiClient
+
+<PageTitle>Tasks | Blazor Multihost Starter</PageTitle>
+
+<section class="task-page" aria-labelledby="tasks-heading">
+    <div class="page-heading">
+        <p class="eyebrow">Shared by Web and MAUI</p>
+        <h1 id="tasks-heading">Your tasks</h1>
+        <p class="page-description">
+            A small end-to-end example: both hosts use the same UI, API, and PostgreSQL database.
+        </p>
+    </div>
+
+    <form class="task-form" @onsubmit="CreateTaskAsync" @onsubmit:preventDefault>
+        <label for="new-task-title">Add a task</label>
+        <div class="task-input-row">
+            <input id="new-task-title"
+                   @bind="_newTitle"
+                   @bind:event="oninput"
+                   maxlength="120"
+                   autocomplete="off"
+                   placeholder="What needs to be done?" />
+            <button class="primary-button" type="submit" disabled="@_isSaving">
+                @(_isSaving ? "Adding…" : "Add task")
+            </button>
+        </div>
+    </form>
+
+    @if (_errorMessage is not null)
+    {
+        <div class="error-panel" role="alert">
+            <p>@_errorMessage</p>
+            <button class="text-button" type="button" @onclick="LoadTasksAsync">Try again</button>
+        </div>
+    }
+
+    <section class="task-list-panel" aria-labelledby="task-list-heading">
+        <div class="list-heading">
+            <h2 id="task-list-heading">Task list</h2>
+            <span class="task-count">@_tasks.Count</span>
+        </div>
+
+        @if (_isLoading)
+        {
+            <p class="empty-state" role="status">Loading tasks…</p>
+        }
+        else if (_tasks.Count == 0)
+        {
+            <p class="empty-state">No tasks yet. Add one above to try the shared flow.</p>
+        }
+        else
+        {
+            <ul class="task-list">
+                @foreach (var task in _tasks)
+                {
+                    <li class="task-row">
+                        <div class="task-copy">
+                            <span class="task-title @(task.IsCompleted ? "completed" : null)">@task.Title</span>
+                            <span class="task-date">@task.CreatedAtUtc.ToLocalTime().ToString("g")</span>
+                        </div>
+                        @if (task.IsCompleted)
+                        {
+                            <span class="status-badge">Completed</span>
+                        }
+                        else
+                        {
+                            <button class="text-button" type="button" @onclick="() => CompleteTaskAsync(task.Id)">
+                                Mark complete
+                            </button>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+</section>
+
+@code {
+    private IReadOnlyList<TaskResponse> _tasks = Array.Empty<TaskResponse>();
+    private string _newTitle = string.Empty;
+    private string? _errorMessage;
+    private bool _isLoading = true;
+    private bool _isSaving;
+
+    protected override Task OnInitializedAsync() => LoadTasksAsync();
+
+    private async Task LoadTasksAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            _tasks = await TasksApiClient.ListAsync();
+        }
+        catch (HttpRequestException)
+        {
+            _errorMessage = "The API is unavailable. Start the Web host and try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CreateTaskAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newTitle))
+        {
+            _errorMessage = "Enter a task title.";
+            return;
+        }
+
+        _isSaving = true;
+        _errorMessage = null;
+
+        try
+        {
+            var createdTask = await TasksApiClient.CreateAsync(_newTitle);
+            _newTitle = string.Empty;
+            _tasks = new[] { createdTask }.Concat(_tasks).ToArray();
+        }
+        catch (TaskApiValidationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _errorMessage = "The task could not be saved. Check the API connection and try again.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task CompleteTaskAsync(Guid id)
+    {
+        _errorMessage = null;
+
+        try
+        {
+            var completedTask = await TasksApiClient.CompleteAsync(id);
+            _tasks = _tasks
+                .Select(task => task.Id == id ? completedTask : task)
+                .ToArray();
+        }
+        catch (HttpRequestException)
+        {
+            _errorMessage = "The task could not be updated. Check the API connection and try again.";
+        }
+    }
+}
