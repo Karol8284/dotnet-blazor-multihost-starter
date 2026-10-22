@@ -185,8 +185,8 @@ container is exposed on host port `5433` so it can coexist with a local
 PostgreSQL server on `5432`. The default WebAssembly client and `/api/tasks`
 are served from one origin. To use Interactive Server, set
 `Web:Interactivity` to `Server` in Web settings and configure the confidential
-server client values above. In Development, OpenAPI is available at
-`/openapi/v1.json`.
+server client values above. When the API is configured in Development, OpenAPI
+is available at `/openapi/v1.json`.
 
 The shared navigation exposes the server-centric, client-local, and offline
 hybrid Tasks examples. IndexedDB data is scoped to the browser/WebView and is
