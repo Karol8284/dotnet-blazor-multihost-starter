@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
 using BlazorMultihostStarter.Client.Authentication;
 using BlazorMultihostStarter.Client;
 using BlazorMultihostStarter.Web.Client.Services;
+using BlazorMultihostStarter.Shared.Tasks;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
@@ -18,7 +19,12 @@ builder.Services.AddMsalAuthentication(options =>
     options.ProviderOptions.DefaultAccessTokenScopes.Add(entraOptions.ApiScope);
 });
 
-builder.Services.AddScoped<IUserAuthenticationSession, WebAuthenticationSession>();
+builder.Services.AddScoped<WebAuthenticationSession>();
+builder.Services.AddScoped<IUserAuthenticationSession>(services =>
+    services.GetRequiredService<WebAuthenticationSession>());
+builder.Services.AddScoped<IApiAccessTokenProvider>(services =>
+    services.GetRequiredService<WebAuthenticationSession>());
 builder.Services.AddTasksApiClient(new Uri(builder.HostEnvironment.BaseAddress));
+builder.Services.AddSharedTaskModes();
 
 await builder.Build().RunAsync();

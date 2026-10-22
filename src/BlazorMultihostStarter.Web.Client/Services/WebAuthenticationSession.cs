@@ -9,7 +9,7 @@ public sealed class WebAuthenticationSession(
     IAccessTokenProvider accessTokenProvider,
     AuthenticationStateProvider authenticationStateProvider,
     NavigationManager navigationManager,
-    EntraClientOptions options) : IUserAuthenticationSession
+    EntraClientOptions options) : IUserAuthenticationSession, IApiAccessTokenProvider
 {
     public async Task<bool> IsSignedInAsync(CancellationToken cancellationToken = default)
     {

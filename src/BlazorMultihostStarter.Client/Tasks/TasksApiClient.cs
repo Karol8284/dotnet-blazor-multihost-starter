@@ -9,7 +9,7 @@ namespace BlazorMultihostStarter.Client.Tasks;
 
 public sealed class TasksApiClient(
     HttpClient httpClient,
-    IUserAuthenticationSession authenticationSession) : ITasksApiClient
+    IApiAccessTokenProvider accessTokenProvider) : ITasksClient
 {
     public async Task<TaskListResponse> ListAsync(
         int page = 1,
@@ -55,11 +55,41 @@ public sealed class TasksApiClient(
             ?? throw new HttpRequestException("The API returned an empty task response.");
     }
 
+    public async Task<TaskSyncResult> SyncAsync(
+        SyncTaskRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await SendAuthorizedAsync(
+            new HttpRequestMessage(HttpMethod.Put, $"api/tasks/{request.Id}/sync")
+            {
+                Content = JsonContent.Create(request)
+            },
+            cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.Conflict)
+        {
+            var conflict = await response.Content.ReadFromJsonAsync<TaskSyncConflictResponse>(
+                cancellationToken)
+                ?? throw new HttpRequestException("The API returned an empty task conflict response.");
+            return new TaskSyncResult.Conflict(conflict.ServerTask);
+        }
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return new TaskSyncResult.Missing();
+        }
+
+        await EnsureSuccessAsync(response, cancellationToken);
+        var task = await response.Content.ReadFromJsonAsync<TaskResponse>(cancellationToken)
+            ?? throw new HttpRequestException("The API returned an empty task sync response.");
+        return new TaskSyncResult.Applied(task);
+    }
+
     private async Task<HttpResponseMessage> SendAuthorizedAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
-        var accessToken = await authenticationSession.GetAccessTokenAsync(cancellationToken);
+        var accessToken = await accessTokenProvider.GetAccessTokenAsync(cancellationToken);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         return await httpClient.SendAsync(request, cancellationToken);
     }

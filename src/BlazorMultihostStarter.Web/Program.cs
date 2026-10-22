@@ -1,17 +1,36 @@
 using BlazorMultihostStarter.Web.Components;
 using BlazorMultihostStarter.Application;
+using BlazorMultihostStarter.Client.Authentication;
+using BlazorMultihostStarter.Client.Tasks;
 using BlazorMultihostStarter.Infrastructure;
-using BlazorMultihostStarter.Web.Security;
+using BlazorMultihostStarter.Shared.Tasks;
 using BlazorMultihostStarter.Web.Modules.Tasks;
+using BlazorMultihostStarter.Web.Configuration;
+using BlazorMultihostStarter.Web.Security;
+using BlazorMultihostStarter.Web.Services;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+var webInteractivity = WebInteractivityMode.Parse(builder.Configuration["Web:Interactivity"]);
 
 builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
 builder.Services.AddOpenApi();
 builder.Services.AddEntraApiAuthentication(builder.Configuration);
+
+if (webInteractivity == WebInteractivity.Server)
+{
+    var tenantId = builder.Configuration["Authentication:Entra:TenantId"]
+        ?? throw new InvalidOperationException("Configure Authentication:Entra:TenantId.");
+    builder.Services.AddEntraInteractiveServerAuthentication(builder.Configuration, tenantId);
+    builder.Services.AddScoped<IUserAuthenticationSession, ServerAuthenticationSession>();
+    builder.Services.AddScoped<ITasksClient, ServerTasksClient>();
+    builder.Services.AddSharedTaskModes();
+}
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -72,8 +91,13 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapTasksModule();
+if (webInteractivity == WebInteractivity.Server)
+{
+    app.MapServerAuthenticationEndpoints();
+}
 
 app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(
         typeof(BlazorMultihostStarter.Shared._Imports).Assembly,

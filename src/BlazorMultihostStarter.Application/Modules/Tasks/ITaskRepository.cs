@@ -12,6 +12,13 @@ public interface ITaskRepository
 
     Task<TaskItem?> FindByIdAsync(Guid id, string ownerId, CancellationToken cancellationToken);
 
+    Task<TaskItem?> FindAnyByIdAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<TaskItem?> FindCurrentByIdAsync(
+        Guid id,
+        string ownerId,
+        CancellationToken cancellationToken);
+
     Task AddAsync(TaskItem task, CancellationToken cancellationToken);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);

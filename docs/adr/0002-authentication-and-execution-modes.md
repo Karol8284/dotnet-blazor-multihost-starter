@@ -1,176 +1,128 @@
-# ADR-0002: Authentication and client/server execution modes
+# ADR-0002: Authentication and execution modes
 
-- **Status:** Accepted for an Entra ID reference integration; app registration values remain deployment-specific
+- **Status:** accepted for the Entra/PostgreSQL reference starter
 - **Date:** 2026-10-22
-- **Scope:** the security baseline and architectural vocabulary for the Tasks reference flow
+- **Scope:** host authentication boundaries, data authority, and task ownership
 
 ## Context
 
-The starter has two UI hosts:
+The solution has WebAssembly, Interactive Server, and MAUI Blazor Hybrid
+execution paths. A shared Razor UI does not make those hosts the same security
+boundary. The original Tasks demo was anonymous and stored every row in one
+global list; that must not be the default for server-owned data.
 
-- a Blazor WebAssembly client hosted by ASP.NET Core;
-- a .NET MAUI Blazor Hybrid application.
+Rendering mode and data authority are independent choices:
 
-Both hosts can render the same Razor Class Library, but they do not have the
-same runtime, storage, browser, or authentication capabilities. In particular,
-the Web host, WebAssembly client, and MAUI client are separate security
-boundaries.
-
-The existing `Tasks` API is anonymous and stores all rows in one global list.
-The feature is demo data today, but neither anonymous access nor global data
-ownership is an acceptable default for a reusable starter.
-
-## Separate two independent architecture choices
-
-The starter distinguishes **where the UI executes** from **where application
-operations and authoritative data live**.
-
-### UI rendering/hosting
-
-- **Interactive WebAssembly:** Razor UI event handling runs in the browser.
-- **Interactive Server:** Razor UI event handling runs on the ASP.NET Core
-  server over a persistent connection.
-- **MAUI Blazor Hybrid:** Razor UI runs in the native app's WebView.
-
-These are host/rendering choices. They do not make business rules or
-authorization trustworthy when executed in a client.
-
-### Operation and data authority
-
-- **Client-local:** a feature uses device/browser-local state or storage and
-  does not claim to be shared or server-authoritative. Suitable examples are
-  presentation preferences and disposable drafts. Local storage is not a
-  security boundary for secrets or shared records.
-- **Server-centric:** the API and database are the source of truth. Clients
-  may validate input for usability, but the API validates every request and
-  authorizes every read and write.
-- **Hybrid:** the client can cache server data or queue offline edits, but the
-  server remains authoritative. Synchronization, conflict handling, replay,
-  and ownership checks must be explicit; a client-side permission check never
-  authorizes a server write.
-
-These modes are selected per capability, not with one global runtime switch.
-The `Tasks` module remains **server-centric** in this ADR. V1 does not implement
-offline mutation queues or claim local-first synchronization.
+- Web rendering: Interactive WebAssembly or Interactive Server.
+- Data authority per feature: server-centric, client-local, or offline hybrid.
 
 ## Authentication decision
 
-The API trusts an external OpenID Connect (OIDC) identity provider. The starter
-does not implement its own identity provider, password database, access-token
-issuer, refresh-token protocol, or cryptographic signing keys.
+The reference identity provider is Microsoft Entra ID. The starter does not
+issue tokens, manage passwords, or implement its own identity provider.
 
-The API accepts **OAuth access tokens** and validates their signature,
-configured issuer, API audience, and lifetime using the provider's OIDC
-metadata/signing keys. ID tokens are not API credentials. All Tasks endpoints
-require an authenticated subject and issuer.
+- The API accepts OAuth access tokens, validates issuer, audience, lifetime,
+  signature, allowed client, delegated scope, tenant, and object ID.
+- WebAssembly and MAUI are public clients and use MSAL Authorization Code +
+  PKCE with separate client IDs and redirect registrations. No client secret
+  is shipped in either client.
+- Interactive Server uses an OIDC confidential Web client and an HttpOnly
+  cookie session. Its server-side task adapter invokes the Application
+  handlers directly under the validated principal; it does not forward a
+  browser token to the API.
+- The API owner is derived only from validated `(tid, oid)` claims. The API
+  never accepts a user or owner identifier from a request body, query, or
+  client-controlled header. Reads and mutations always include that owner.
+- Integration tests use a test-only identity handler. It is not a development
+  sign-in mechanism and cannot replace real Entra validation.
 
-Both clients are public clients and must use Authorization Code with PKCE.
-Client secrets must never be put in WebAssembly assets, MAUI packages, or
-committed configuration. The browser and native clients use separate client
-registrations and redirect URIs. They may share the API audience and required
-delegated scope.
+Microsoft Entra ID and PostgreSQL are opinionated reference providers. Another
+identity provider or database is not a configuration-only switch; its claim,
+token, persistence, migration, and platform behavior must be adapted and
+verified separately.
 
-The API's data owner is derived only from the validated `(tid, oid)` claims.
-For Entra, `oid` is stable across separate Web and MAUI app registrations,
-while `sub` is a pairwise identifier and can differ by client ID. The API never
-accepts a user/owner identifier from a request body, query parameter, or
-client-controlled header. Every Tasks list, read, and mutation is scoped to
-that owner. Existing anonymous demo rows receive a reserved legacy owner
-during migration and remain inaccessible to authenticated users.
+## Data mode decisions
 
-Integration tests use a test-only authentication handler that can issue
-separate identities. It is registered only by the test host and is not a
-development or production sign-in mechanism.
+### Server-centric
 
-### Client authentication adapters
+The API and PostgreSQL are authoritative. The API verifies the bearer token,
+delegated scope, client application, and owner before using a task handler.
+The Interactive Server Web host applies the same owner derivation before
+invoking Application handlers directly. MAUI and WebAssembly call the API.
 
-- WebAssembly uses the ASP.NET Core MSAL authentication integration with
-  Authorization Code + PKCE and requests a delegated access token for the API.
-- MAUI uses MSAL public-client flows and the platform broker/system browser.
-  Windows uses the Windows broker; Android and iOS use their registered MSAL
-  redirect configuration. The WebView is not used as an embedded
-  credential-entry browser.
-- Each host provides its own token-acquisition adapter to the shared API
-  client. Shared Razor components do not know about provider SDKs or token
-  storage.
-- The selected reference provider is Microsoft Entra ID with MSAL. Tenant ID,
-  API application ID, Web client ID, MAUI client ID, and redirect registrations
-  are deployment-specific public configuration, not secrets. A different OIDC
-  provider may be used by replacing the client adapters and API metadata
-  configuration after its claims and platform flows are verified.
-- The built-in .NET MAUI `WebAuthenticator` is documented as currently not
-  working on Windows. The Windows adapter therefore uses MSAL's Windows
-  broker rather than relying on `WebAuthenticator`.
+### Client-local
+
+The `/tasks/local` example stores low-sensitivity task data in IndexedDB for
+the current browser or app WebView. It has no API, cross-device sharing, or
+sign-in requirement. IndexedDB is not a secure vault and must not store
+credentials or sensitive records.
+
+### Offline hybrid
+
+The `/tasks/offline` example saves local changes and a pending snapshot in
+IndexedDB before sync. The server remains authoritative. Every sync request
+contains the client-generated task ID and the last known `BaseVersion`; it
+does not contain an owner ID.
+
+The server applies a snapshot only when its base version matches. New client
+IDs make create retries idempotent. A stale version returns `409 Conflict`
+with the current server snapshot. The user chooses either to keep the server
+snapshot or rebase and retry the local snapshot. The example has no background
+sync worker and does not silently use last-write-wins.
 
 ## Consequences
 
-- Anonymous access to `/api/tasks` is removed; unauthenticated requests receive
-  `401`.
-- User A cannot list, read, complete, or otherwise mutate User B's Tasks. An
-  inaccessible task is returned as `404` to avoid disclosing its existence.
-- The `Tasks` owner key is created at the API boundary from validated identity
-  claims. Domain and persistence code receive that trusted owner key explicitly.
-- Task listing is owner-scoped, uses a default page size of 25, enforces a
-  maximum page size of 100, and returns whether another page exists.
-- The Tasks API has an in-memory fixed-window rate limit of 60 requests per
-  minute per authenticated owner. Multi-instance deployment needs a
-  distributed limiter or an upstream gateway policy.
-- WebAssembly and MAUI require different authentication registrations even
-  though they reuse the same UI and API client abstraction.
-- A tenant is not bundled by this ADR. Without a configured tenant and app
-  registrations, the application must not silently fall back to anonymous
-  access.
-- Cookie/BFF authentication is not selected. If a future Web host uses
-  authenticated cookies for API calls, add and test antiforgery protection for
-  state-changing requests; `UseAntiforgery()` alone is not endpoint
-  authorization.
-- The `Tasks` reference flow is not production-ready until a real provider,
-  HTTPS API addresses, production configuration, and both client sign-in
-  paths have been exercised.
+- Every API Tasks route requires authentication and the `Tasks.ReadWrite`
+  delegated scope. Inaccessible records return `404` to avoid disclosing
+  whether another user owns them.
+- List requests default to 25 items and are capped at 100. The process-local
+  rate limit is 60 requests per owner per minute; scale-out needs a distributed
+  limiter or gateway policy.
+- EF uses a task version concurrency token. Concurrent writes are reported as
+  conflicts rather than overwriting a newer snapshot.
+- Web interactivity is selected by `Web:Interactivity`; data modes are separate
+  route examples and are selected per feature, not by one global data switch.
+- Production configuration requires verified HTTPS redirects and host names.
+  Interactive Server's client secret belongs in User Secrets or a secret
+  manager.
 
 ## Verification boundary
 
-- Automated tests use a test-only authentication scheme. They verify
-  anonymous rejection, required delegated scope, registered client IDs,
-  pagination/rate limits, and cross-user task isolation.
-- The production API uses `JwtBearer` metadata/signature, issuer, audience,
-  expiry, Entra tenant, and `oid` validation. These real Entra token-validation
-  and redirect flows are not exercised by the test scheme.
-- A real Entra app registration and runtime sign-in test for Web and every
-  claimed MAUI platform are required before declaring the authentication
-  integration production-ready.
-- Invalid or incomplete API configuration fails startup. Client IDs and scopes
-  are public configuration; no client secret or token is included in source.
+- Automated tests cover anonymous rejection, scope/client checks, owner
+  isolation, pagination/rate limits, sync retry behavior, and stale-version
+  conflicts. CI exercises the API/migration path against PostgreSQL.
+- Tests use a test identity. They do not verify real Entra metadata/token
+  validation, browser redirects, native broker callbacks, or sign-out on
+  physical devices.
+- The local and hybrid pages use IndexedDB through JS interop. Host builds and
+  unit/component tests do not replace runtime storage tests on every target.
+- Do not describe the authentication flow as production-ready until real
+  tenant registrations and host-specific sign-in paths have been exercised.
 
 ## Alternatives considered
 
-### Copy the React starter's browser token flow
+### Trust client-side authorization or an owner ID in the request
 
-Rejected. The React application stores an access token in `localStorage`; this
-is not a default to copy into a Blazor WebAssembly client. Browser and MAUI
-clients have different token-storage mechanisms, and the API must remain the
-authorization authority.
+Rejected. A client can be modified; the server derives ownership from a
+validated identity.
 
-### Issue JWTs in this application
+### Copy a browser token-storage flow into MAUI
 
-Rejected for the starter's first secure flow. Implementing an identity/token
-issuer, password lifecycle, signing-key rotation, refresh-token replay
-protection, account recovery, and multi-client protocols would be a separate
-security product, not a small Tasks slice.
+Rejected. WebAssembly and native clients have different storage and callback
+requirements. Both use host-specific MSAL adapters.
 
-### Trust client-side authorization or a client-provided owner ID
+### Automatically resolve stale offline writes with last-write-wins
 
-Rejected. A caller can modify client code and request data. The API derives
-the data owner from validated claims and scopes every data operation.
+Rejected. It can silently lose user edits. The sample reports a conflict and
+requires an explicit choice.
 
-### Treat Interactive Server as server-side authorization
+### Claim local-first synchronization for the client-local mode
 
-Rejected. Render mode is not a data-access policy. The API still validates
-identity and ownership regardless of where a component happens to execute.
+Rejected. `/tasks/local` is device-local only. Cross-device synchronization is
+demonstrated separately by the offline-hybrid route.
 
 ## References
 
 - [Microsoft Learn: JWT bearer authentication in ASP.NET Core](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/configure-jwt-bearer-authentication?view=aspnetcore-10.0)
 - [Microsoft Learn: Blazor WebAssembly OIDC authentication](https://learn.microsoft.com/en-us/aspnet/core/blazor/security/webassembly/standalone-with-authentication-library?view=aspnetcore-10.0)
-- [Microsoft Learn: .NET MAUI WebAuthenticator](https://learn.microsoft.com/en-us/dotnet/maui/platform-integration/communication/authentication?view=net-maui-10.0)
 - [Microsoft Learn: MAUI authentication and authorization](https://learn.microsoft.com/en-us/dotnet/architecture/maui/authentication-and-authorization)

@@ -3,6 +3,7 @@ using BlazorMultihostStarter.Client.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Maui.Storage;
+using BlazorMultihostStarter.Shared.Tasks;
 
 namespace BlazorMultihostStarter;
 
@@ -44,11 +45,16 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
             });
 
-        builder.Services.AddSingleton<IUserAuthenticationSession>(services =>
+        builder.Services.AddSingleton(services =>
             new MauiEntraAuthenticationSession(
                 settingsOptions.Entra,
                 services.GetRequiredService<ILogger<MauiEntraAuthenticationSession>>()));
+        builder.Services.AddSingleton<IUserAuthenticationSession>(services =>
+            services.GetRequiredService<MauiEntraAuthenticationSession>());
+        builder.Services.AddSingleton<IApiAccessTokenProvider>(services =>
+            services.GetRequiredService<MauiEntraAuthenticationSession>());
         builder.Services.AddTasksApiClient(new Uri(settingsOptions.ApiBaseAddress));
+        builder.Services.AddSharedTaskModes();
 
         builder.Services.AddMauiBlazorWebView();
 

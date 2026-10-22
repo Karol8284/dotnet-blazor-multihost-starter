@@ -9,7 +9,7 @@ using Microsoft.Identity.Client.Desktop;
 
 namespace BlazorMultihostStarter;
 
-public sealed class MauiEntraAuthenticationSession : IUserAuthenticationSession
+public sealed class MauiEntraAuthenticationSession : IUserAuthenticationSession, IApiAccessTokenProvider
 {
     private readonly EntraClientOptions _options;
     private readonly ILogger<MauiEntraAuthenticationSession> _logger;

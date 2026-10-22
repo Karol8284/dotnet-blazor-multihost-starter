@@ -7,8 +7,9 @@ public sealed record TaskDetails(
     string Title,
     bool IsCompleted,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset? CompletedAtUtc)
+    DateTimeOffset? CompletedAtUtc,
+    int Version = 1)
 {
     public static TaskDetails From(TaskItem task) =>
-        new(task.Id, task.Title, task.IsCompleted, task.CreatedAtUtc, task.CompletedAtUtc);
+        new(task.Id, task.Title, task.IsCompleted, task.CreatedAtUtc, task.CompletedAtUtc, task.Version);
 }

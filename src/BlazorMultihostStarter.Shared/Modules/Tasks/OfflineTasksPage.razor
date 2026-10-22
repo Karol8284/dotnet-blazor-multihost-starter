@@ -1,0 +1,343 @@
+@page "/tasks/offline"
+@inject IHybridTasksClient HybridTasks
+@inject IUserAuthenticationSession AuthenticationSession
+
+<PageTitle>Offline tasks | Blazor Multihost Starter</PageTitle>
+
+<section class="mode-page" aria-labelledby="offline-heading">
+    <div class="mode-heading">
+        <p class="eyebrow">Data mode · hybrid offline</p>
+        <h1 id="offline-heading">Work offline, sync deliberately</h1>
+        <p>Changes are persisted locally first. The API remains authoritative after synchronization; version conflicts require an explicit choice.</p>
+        @if (_isSignedIn)
+        {
+            <button class="text-button" type="button" @onclick="SignOutAsync">Sign out</button>
+        }
+        else
+        {
+            <button class="text-button" type="button" @onclick="SignInAsync">Sign in to sync</button>
+        }
+    </div>
+
+    @if (_errorMessage is not null)
+    {
+        <div class="error-panel" role="alert">@_errorMessage</div>
+    }
+    @if (_syncMessage is not null)
+    {
+        <p class="sync-message" role="status">@_syncMessage</p>
+    }
+
+    <form class="mode-form" @onsubmit="CreateAsync" @onsubmit:preventDefault>
+        <label for="offline-task-title">Add a task while online or offline</label>
+        <div class="mode-input-row">
+            <input id="offline-task-title" @bind="_newTitle" @bind:event="oninput" maxlength="120" />
+            <button class="primary-button" type="submit" disabled="@(_isSaving || _isSyncing)">Save locally</button>
+        </div>
+    </form>
+
+    <section class="mode-panel" aria-labelledby="offline-list-heading">
+        <div class="mode-list-heading">
+            <h2 id="offline-list-heading">Pending and synchronized tasks</h2>
+            <button class="primary-button" type="button"
+                    disabled="@(!_isSignedIn || _isSyncing || _isSaving || !_tasks.Any(task => task.SyncState == LocalTaskSyncState.Pending))"
+                    @onclick="SyncAsync">
+                @(_isSyncing ? "Syncing…" : "Sync pending")
+            </button>
+        </div>
+        @if (!_loaded)
+        {
+            <p role="status">Loading local task queue…</p>
+        }
+        else if (_tasks.Count == 0)
+        {
+            <p class="empty-state">No hybrid tasks yet.</p>
+        }
+        else
+        {
+            <ul class="mode-list">
+                @foreach (var record in _tasks)
+                {
+                    <li class="mode-row mode-row-stacked">
+                        <div class="mode-task-copy">
+                            <input aria-label="@($"Title for {record.Task.Title}")"
+                                   @bind="_editTitles[record.Task.Id]"
+                                   @bind:event="oninput"
+                                   maxlength="120"
+                                   disabled="@(_isSaving || _isSyncing || record.SyncState is LocalTaskSyncState.Conflict or LocalTaskSyncState.Missing)" />
+                            <small>@DescribeState(record)</small>
+                        </div>
+                        <div class="mode-actions">
+                            <button class="text-button" type="button"
+                                    disabled="@(_isSaving || _isSyncing || record.SyncState is LocalTaskSyncState.Conflict or LocalTaskSyncState.Missing)"
+                                    @onclick="() => RenameAsync(record.Task.Id)">Save title</button>
+                            @if (!record.Task.IsCompleted)
+                            {
+                                <button class="text-button" type="button"
+                                        disabled="@(_isSaving || _isSyncing || record.SyncState is LocalTaskSyncState.Conflict or LocalTaskSyncState.Missing)"
+                                        @onclick="() => CompleteAsync(record.Task.Id)">Complete</button>
+                            }
+                        </div>
+
+                        @if (record.SyncState == LocalTaskSyncState.Conflict && record.ServerTask is not null)
+                        {
+                            <div class="sync-conflict" role="group" aria-label="Resolve task conflict">
+                                <p>Server title: <strong>@record.ServerTask.Title</strong>; local title: <strong>@record.Task.Title</strong>.</p>
+                                <button class="text-button" type="button" disabled="@(_isSaving || _isSyncing)" @onclick="() => ResolveConflictAsync(record.Task.Id, keepLocal: false)">Keep server</button>
+                                <button class="text-button" type="button" disabled="@(_isSaving || _isSyncing)" @onclick="() => ResolveConflictAsync(record.Task.Id, keepLocal: true)">Keep local and retry</button>
+                            </div>
+                        }
+                        else if (record.SyncState == LocalTaskSyncState.Missing)
+                        {
+                            <div class="sync-conflict" role="group" aria-label="Remove a task missing on the server">
+                                <p>The server task no longer exists. Remove the retained local copy or recreate it by creating a new task.</p>
+                                <button class="text-button" type="button" disabled="@(_isSaving || _isSyncing)" @onclick="() => RemoveMissingAsync(record.Task.Id)">Remove local copy</button>
+                            </div>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+</section>
+
+@code {
+    private IReadOnlyList<LocalTaskRecord> _tasks = [];
+    private readonly Dictionary<Guid, string> _editTitles = [];
+    private string _newTitle = string.Empty;
+    private string? _errorMessage;
+    private string? _syncMessage;
+    private bool _isSignedIn;
+    private bool _loaded;
+    private bool _isSaving;
+    private bool _isSyncing;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _isSignedIn = await AuthenticationSession.IsSignedInAsync();
+            }
+            catch (AuthenticationOperationException exception)
+            {
+                _errorMessage = exception.Message;
+            }
+
+            await RefreshAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        try
+        {
+            _tasks = await HybridTasks.ListAsync();
+            _editTitles.Clear();
+            foreach (var record in _tasks)
+            {
+                _editTitles[record.Task.Id] = record.Task.Title;
+            }
+            _errorMessage = null;
+        }
+        catch (JSException)
+        {
+            _errorMessage = "The local IndexedDB queue could not be opened.";
+        }
+        finally
+        {
+            _loaded = true;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _isSaving = true;
+        try
+        {
+            await HybridTasks.CreateAsync(_newTitle);
+            _newTitle = string.Empty;
+            await RefreshAsync();
+        }
+        catch (TaskApiValidationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (JSException)
+        {
+            _errorMessage = "The task could not be saved to the local queue.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task CompleteAsync(Guid id)
+    {
+        _isSaving = true;
+        try
+        {
+            await HybridTasks.CompleteAsync(id);
+            await RefreshAsync();
+        }
+        catch (HttpRequestException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (InvalidOperationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (JSException)
+        {
+            _errorMessage = "The completion could not be saved to the local queue.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task RenameAsync(Guid id)
+    {
+        _isSaving = true;
+        try
+        {
+            await HybridTasks.RenameAsync(id, _editTitles.GetValueOrDefault(id));
+            await RefreshAsync();
+        }
+        catch (TaskApiValidationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (HttpRequestException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (InvalidOperationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (JSException)
+        {
+            _errorMessage = "The title could not be saved to the local queue.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task SyncAsync()
+    {
+        _isSyncing = true;
+        _errorMessage = null;
+        _syncMessage = null;
+        try
+        {
+            var report = await HybridTasks.SyncPendingAsync();
+            _syncMessage = $"Applied: {report.AppliedCount}; conflicts: {report.ConflictCount}; missing on server: {report.MissingCount}.";
+            await RefreshAsync();
+        }
+        catch (AuthenticationRequiredException)
+        {
+            _isSignedIn = false;
+            _errorMessage = "Sign in before synchronizing. Local changes remain on this device.";
+        }
+        catch (HttpRequestException exception)
+        {
+            if (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                _isSignedIn = false;
+                _errorMessage = "The sign-in session expired. Local changes remain on this device.";
+            }
+            else
+            {
+                _errorMessage = exception.StatusCode is null
+                    ? "The API is unavailable. Local changes remain on this device; start the Web host and retry."
+                    : $"Synchronization failed with HTTP {(int)exception.StatusCode}. Local changes remain on this device.";
+            }
+        }
+        catch (JSException)
+        {
+            _errorMessage = "The local queue could not be updated. Check browser or WebView storage permissions.";
+        }
+        finally
+        {
+            _isSyncing = false;
+        }
+    }
+
+    private async Task ResolveConflictAsync(Guid id, bool keepLocal)
+    {
+        try
+        {
+            await HybridTasks.ResolveConflictAsync(id, keepLocal);
+            await RefreshAsync();
+        }
+        catch (InvalidOperationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (JSException)
+        {
+            _errorMessage = "The conflict choice could not be saved locally.";
+        }
+    }
+
+    private async Task RemoveMissingAsync(Guid id)
+    {
+        try
+        {
+            await HybridTasks.RemoveMissingAsync(id);
+            await RefreshAsync();
+        }
+        catch (InvalidOperationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (JSException)
+        {
+            _errorMessage = "The local copy could not be removed.";
+        }
+    }
+
+    private async Task SignInAsync()
+    {
+        try
+        {
+            await AuthenticationSession.SignInAsync();
+        }
+        catch (AuthenticationOperationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+    }
+
+    private async Task SignOutAsync()
+    {
+        try
+        {
+            await AuthenticationSession.SignOutAsync();
+            _isSignedIn = false;
+        }
+        catch (AuthenticationOperationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+    }
+
+    private static string DescribeState(LocalTaskRecord record) =>
+        record.SyncState switch
+        {
+            LocalTaskSyncState.LocalOnly => "Stored only on this device; not synchronized.",
+            LocalTaskSyncState.Pending => "Saved locally; waiting to synchronize.",
+            LocalTaskSyncState.Synced => $"Synchronized at server version {record.BaseVersion}.",
+            LocalTaskSyncState.Conflict => $"Changed on the server since local version {record.BaseVersion}.",
+            LocalTaskSyncState.Missing => "The server no longer has this task.",
+            _ => throw new InvalidOperationException("The local task state is unknown.")
+        };
+}

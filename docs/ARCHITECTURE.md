@@ -3,39 +3,36 @@
 ## Runtime shape
 
 ```text
-Browser
-  └─ Blazor WebAssembly + MSAL ─┐
-                                ├─ Bearer access token ─> Tasks API
-MAUI Blazor Hybrid + MSAL ──────┘                          │
-                                                          v
-                                              Tasks application slices
-                                                          │
-                                                          v
-                                            PostgreSQL through EF Core
+Browser (WebAssembly + MSAL) ───────────────┐
+                                            ├─ bearer token ─> Tasks API ─> PostgreSQL
+MAUI Blazor Hybrid + MSAL ──────────────────┘
 
-                         Microsoft Entra ID
-                       (OIDC, separate clients)
+Browser (Interactive Server + OIDC cookie) ─────> Tasks Application ──────┘
 
-Browser UI and MAUI UI both use BlazorMultihostStarter.Shared (RCL).
+Browser/WebView local-only page ──> IndexedDB (device-local)
+Browser/WebView offline page ─────> IndexedDB queue ──> versioned sync API
+
+All hosts render components from BlazorMultihostStarter.Shared (RCL).
 ```
 
-The Web host serves both the WebAssembly assets and `/api` endpoints in V1.
-MAUI is a separate process and calls that same API. Neither UI host accesses
-PostgreSQL or Infrastructure directly.
+The Web host provides both Interactive WebAssembly and Interactive Server.
+`Web:Interactivity` selects the Web rendering mode; the default is
+`WebAssembly`. MAUI always renders locally in a BlazorWebView. Rendering mode
+and data authority are independent choices.
 
 ## Projects and responsibilities
 
 | Project | Responsibility |
 | --- | --- |
-| `BlazorMultihostStarter.Domain` | Task invariants and domain entities; no EF Core or host dependencies. |
-| `BlazorMultihostStarter.Application` | Tasks use cases, application results, and persistence ports, grouped by vertical slice. |
-| `BlazorMultihostStarter.Contracts` | Stable HTTP request and response DTOs shared by API and clients. |
-| `BlazorMultihostStarter.Infrastructure` | EF Core DbContext, PostgreSQL mapping, migrations, and repository adapters. |
-| `BlazorMultihostStarter.Client` | Typed bearer-token HTTP API client and host-neutral authentication contract. |
-| `BlazorMultihostStarter.Shared` | Razor Class Library: route, layout, components, and styles shared by both UI hosts. |
-| `BlazorMultihostStarter.Web` | ASP.NET Core host, Entra JWT validation, API endpoints, and server composition root. |
-| `BlazorMultihostStarter.Web.Client` | Browser-side MSAL/OIDC flow, token acquisition, and WebAssembly routes. |
-| `BlazorMultihostStarter.Maui` | Native MAUI shell, MSAL public-client flow, platform broker setup, and API configuration. |
+| `BlazorMultihostStarter.Domain` | Task invariants and versioned task entity; no host or EF dependencies. |
+| `BlazorMultihostStarter.Application` | Task use cases and persistence port, grouped by vertical slice. |
+| `BlazorMultihostStarter.Contracts` | HTTP request/response DTOs shared with API clients. |
+| `BlazorMultihostStarter.Infrastructure` | EF Core, PostgreSQL mappings, migrations, and repository adapter. |
+| `BlazorMultihostStarter.Client` | Host-neutral task client contracts, HTTP bearer client, and local/offline queue logic. |
+| `BlazorMultihostStarter.Shared` | Shared Razor UI, IndexedDB adapter, mode navigation, and styles. |
+| `BlazorMultihostStarter.Web` | ASP.NET Core composition root, JWT API, optional OIDC cookie host, endpoints, and persistence. |
+| `BlazorMultihostStarter.Web.Client` | Browser MSAL flow and WebAssembly registration of the HTTP client. |
+| `BlazorMultihostStarter.Maui` | Native shell, MSAL public client, platform redirects, and API configuration. |
 
 ## Dependency direction
 
@@ -58,88 +55,98 @@ graph TD
     Web --> Contracts
 ```
 
-More precisely:
-
 - `Domain` has no project references.
-- `Application` references `Domain`.
-- `Infrastructure` references `Application` and `Domain`.
-- `Client` references only `Contracts`.
-- `Shared` references `Client` and `Contracts`; it does not reference MAUI,
-  Web host, API, or Infrastructure.
-- Web and MAUI are composition roots. Only the Web host references server
-  Application/Infrastructure projects.
+- `Application` references `Domain`; `Infrastructure` implements application
+  ports.
+- `Client` references only API contracts; it does not depend on EF or hosts.
+- `Shared` does not reference Web, MAUI, or Infrastructure. Its IndexedDB
+  adapter uses the cross-host `IJSRuntime` supported by browser and WebView.
+- WebAssembly and MAUI register an HTTP `ITasksClient`; Interactive Server
+  registers a server adapter that invokes the same Application handlers.
 
-The client and server may share DTOs, not EF entities. API contracts are not a
-security boundary. The API validates the access token and scope, then derives
-task ownership from validated Entra `tid` and `oid` claims. An owner ID in
-client input is never trusted.
+Domain entities never cross the API boundary. The API does not accept an owner
+ID from a client; it derives the owner from validated Entra `tid` and `oid`.
 
-## Vertical slices and module boundary
+## Data modes
 
-`Tasks` is the first reference module. Application use cases live together by
-feature and operation:
+The routes are separate examples, not a global persistence switch:
+
+| Route | Mode | Authority and storage |
+| --- | --- | --- |
+| `/` | Server-centric | API and PostgreSQL are authoritative. WebAssembly and MAUI use the protected API; Interactive Server invokes Application handlers under its authenticated user session. |
+| `/tasks/local` | Client-local | IndexedDB in the current browser/WebView. No API, cross-device sharing, or sign-in. |
+| `/tasks/offline` | Offline hybrid | IndexedDB stores local snapshots and pending edits; the authenticated API remains authoritative after manual sync. |
+
+IndexedDB is per browser origin or installed app WebView. It can be cleared by
+the user or platform and is not protected storage for credentials or sensitive
+records. The local-only example intentionally does not synchronize.
+
+Hybrid synchronization sends a task snapshot and its `BaseVersion`. New tasks
+use client-generated IDs, making a repeated create request idempotent. Existing
+tasks update only when the version still matches. The server increments a
+concurrency-token version and returns `409 Conflict` with the current server
+snapshot when another edit won. The UI requires an explicit choice to keep the
+server version or rebase and retry the local snapshot; there is no silent
+last-write-wins behavior. Sync is manual and has no background worker.
+
+## Web interactivity modes
+
+- **Interactive WebAssembly:** the browser is a public MSAL client and calls
+  the same-origin bearer-token API. This is the default.
+- **Interactive Server:** the browser uses an OIDC cookie session. The
+  server-side task client calls Application handlers directly; it does not
+  forward a browser token to its own API. This mode requires a confidential
+  Entra Web client and a secret stored outside source control.
+- **MAUI Blazor Hybrid:** UI events run in the native app's WebView; MAUI uses
+  its own MSAL public-client registration and calls the protected API.
+
+Change `Web:Interactivity` to `Server` or `WebAssembly` in Web configuration.
+The authentication mechanisms differ by host, while the RCL and business
+invariants are shared. A mode change does not change the authority of the data
+mode selected by a feature.
+
+## Vertical slices and modules
+
+`Tasks` is the reference VSA module:
 
 ```text
 Application/Modules/Tasks/
-  Shared/
-  ListTasks/
-  GetTask/
   CreateTask/
+  GetTask/
+  ListTasks/
   CompleteTask/
-
-Shared/Modules/Tasks/
-  TasksPage.razor
+  SyncTask/
 ```
 
-The Web API has one `Tasks` endpoint module, while Infrastructure owns the
-EF-backed adapter for the module's application port. The solution uses direct
-constructor injection rather than a mediator or reflection-based
-auto-discovery. Add a framework only after multiple real slices demonstrate a
-specific benefit.
+Each new capability should add only the UI, application use case, persistence
+port/adapter, API contract/endpoint (if required), and tests it needs. The
+solution uses direct constructor injection rather than a mediator or
+reflection-based discovery. Add a framework only after multiple real slices
+demonstrate its value.
 
-`Tasks` is intentionally the only V1 business module. A future module should
-have a clear capability boundary and explicit public contracts; do not create
-empty layers or split projects merely to increase project count.
+## API and synchronization safeguards
 
-## Data flow
+- All Tasks API routes require a valid Entra access token, issuer, audience,
+  approved client ID, delegated scope, tenant, and object ID.
+- Every list/read/mutation is scoped by the authenticated owner.
+- Lists default to 25 items and reject page sizes above 100.
+- The API rate limit is 60 requests per minute per authenticated owner in each
+  process. Multi-instance deployments need a distributed limiter or gateway
+  policy.
+- EF's task version is an optimistic concurrency token. Stale local snapshots
+  produce a conflict response; an API request never supplies an owner ID.
+- Migrations are applied explicitly with `dotnet ef database update`; the Web
+  host does not mutate a production database automatically.
 
-1. A shared Razor component calls `ITasksApiClient`.
-2. The host-specific authentication session obtains a delegated access token
-   through MSAL; the Web client and MAUI client keep separate public-client
-   registrations and redirect configuration.
-3. `TasksApiClient` attaches the access token to the HTTP request. It never
-   sends a client-supplied owner ID.
-4. The Tasks API validates the Entra signature, issuer, audience, allowed
-   client ID, delegated scope, tenant, and user object ID.
-5. The endpoint derives the owner key from `tid` + `oid` and invokes one
-   application use case with that key.
-6. Infrastructure filters every list/read/mutation by owner and persists
-   through EF Core/PostgreSQL.
-7. The API returns a public contract DTO; no EF entity crosses the boundary.
+## Provider and production boundaries
 
-List requests are paginated: the API defaults to 25 items, enforces a maximum
-page size of 100, and applies an in-memory fixed-window rate limit of 60
-requests per minute per authenticated user. The limiter is per process; a
-multi-instance production deployment needs an upstream or distributed limiter.
+The reference implementation is intentionally specific to Microsoft Entra ID,
+MSAL, PostgreSQL, and EF Core. The template parameterizes application names,
+bundle ID, and public Entra IDs; it does not ship alternate identity or
+database providers. Replacing a provider requires adapting and validating the
+host-specific auth/storage layer.
 
-The Tasks list endpoint uses page-based results with a default page size of 25
-and an enforced maximum of 100. API requests are rate-limited to 60 per minute
-per authenticated tenant/user (or per remote IP before authentication).
-The built-in limiter is in-memory and per process; multi-instance production
-deployments need a distributed limiter or an upstream gateway policy.
-
-Migrations are applied explicitly with `dotnet ef database update`; the Web
-host does not mutate a production database automatically on startup.
-
-## Operation/data modes
-
-Blazor rendering mode and data authority are independent choices. The current
-Web host uses Interactive WebAssembly, while MAUI renders locally in a
-BlazorWebView. The Tasks feature is server-centric in both hosts: PostgreSQL
-and the API remain authoritative and every request is authorized.
-
-Client-local data is appropriate for non-sensitive preferences or disposable
-drafts. A future hybrid/offline feature may cache server data or queue writes,
-but must define sync, replay, conflict, and authorization behavior explicitly.
-V1/V2 does not implement offline synchronization. See
-[ADR-0002](./adr/0002-authentication-and-execution-modes.md).
+This is a learning/reference starter, not production-ready software. Real
+Entra sign-in on every claimed platform, deployment-specific HTTPS redirects,
+production operations, and a multi-instance rate-limit strategy must be
+verified separately. See the ADRs for explicit evidence boundaries.

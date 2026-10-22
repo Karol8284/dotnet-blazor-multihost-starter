@@ -17,7 +17,7 @@
     <ApplicationTitle>Blazor Multihost Starter</ApplicationTitle>
 
     <ApplicationId>com.example.blazormultihoststarter</ApplicationId>
-    <ApplicationIdGuid>8B1AFA41-D53A-4476-A6D4-1C082071AA52</ApplicationIdGuid>
+    <ApplicationIdGuid>__MAUI_APPLICATION_ID_GUID__</ApplicationIdGuid>
 
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>

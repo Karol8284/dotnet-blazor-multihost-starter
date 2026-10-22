@@ -3,6 +3,16 @@
 Use the Tasks module as the VSA reference. Start with one user-visible use
 case, then add only the code and tests that use case needs.
 
+Before implementing a feature, choose its data mode:
+
+- server-centric: API and database are authoritative;
+- client-local: data stays in the current browser/device and is not synced;
+- offline hybrid: persist locally, then synchronize against the server with an
+  explicit conflict policy.
+
+Choose the Web runtime separately with `Web:Interactivity` (`WebAssembly` or
+`Server`). Do not treat rendering mode as authorization or data authority.
+
 ## Add a use case to Tasks
 
 For a new operation:
@@ -19,9 +29,17 @@ For a new operation:
    expected validation and not-found results to explicit HTTP responses.
    Require the Tasks authorization policy and derive owner identity only from
    validated claims; never accept an owner ID from a client request.
-6. Add the operation to `ITasksApiClient` and its implementation if a UI host
-   needs it.
-7. Add or update the feature UI in
+6. For server-centric work, add the operation to `ITasksClient` and its HTTP
+   implementation. The Interactive Server host has a server-side adapter to
+   Application handlers; it must derive the same owner from the authenticated
+   principal. Do not put Infrastructure in the shared UI.
+7. For client-local or offline work, use `ILocalTasksClient` or
+   `IHybridTasksClient` and persist through `ITasksLocalStore`. Keep
+   local-only data separate from the server queue.
+8. For sync operations, define retry/idempotency behavior, a version or other
+   concurrency token, and explicit conflict responses. Never silently
+   overwrite newer server state.
+9. Add or update the feature UI in
    `Shared/Modules/Tasks/`. Host-specific behavior belongs in host services
    injected through DI, not `#if` branches in UI.
 
@@ -40,6 +58,9 @@ For a new operation:
   component parameters, URLs, or logs.
 - Shared UI: loading, empty, success, validation, and API-failure states when
   the component changes.
+- Client-local: storage and validation behavior without network access.
+- Offline hybrid: local persistence while offline, sync retry, stale-version
+  conflict, and both explicit resolution choices.
 - Build the Web host and a supported MAUI target after changing shared code.
 
 ## Add a new module

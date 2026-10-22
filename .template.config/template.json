@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Karol8284",
+  "classifications": [
+    "Blazor",
+    "MAUI",
+    "Web",
+    "Multiplatform"
+  ],
+  "identity": "Karol8284.BlazorMultihostStarter",
+  "name": "Blazor Web and MAUI Multihost Starter",
+  "shortName": "blazor-multihost-starter",
+  "sourceName": "BlazorMultihostStarter",
+  "preferNameDirectory": true,
+  "symbols": {
+    "appTitle": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "Blazor Multihost Starter",
+      "replaces": "Blazor Multihost Starter",
+      "description": "Human-readable application title."
+    },
+    "mauiBundleId": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "com.example.blazormultihoststarter",
+      "replaces": "com.example.blazormultihoststarter",
+      "description": "Reverse-DNS bundle identifier used by MAUI and native redirects."
+    },
+    "tenantId": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "__TENANT_ID__",
+      "replaces": "__TENANT_ID__",
+      "description": "Microsoft Entra tenant GUID."
+    },
+    "apiClientId": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "__API_CLIENT_ID__",
+      "replaces": "__API_CLIENT_ID__",
+      "description": "Microsoft Entra API application GUID."
+    },
+    "webClientId": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "__WEB_CLIENT_ID__",
+      "replaces": "__WEB_CLIENT_ID__",
+      "description": "Microsoft Entra WebAssembly public-client GUID."
+    },
+    "mauiClientId": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "__MAUI_CLIENT_ID__",
+      "replaces": "__MAUI_CLIENT_ID__",
+      "description": "Microsoft Entra MAUI public-client GUID."
+    },
+    "serverClientId": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "__SERVER_CLIENT_ID__",
+      "replaces": "__SERVER_CLIENT_ID__",
+      "description": "Microsoft Entra confidential Web client GUID for Interactive Server."
+    },
+    "mauiApplicationIdGuid": {
+      "type": "generated",
+      "generator": "guid",
+      "replaces": "__MAUI_APPLICATION_ID_GUID__"
+    },
+    "webUserSecretsId": {
+      "type": "generated",
+      "generator": "guid",
+      "replaces": "__WEB_USER_SECRETS_ID__"
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "exclude": [
+            "**/[Bb]in/**",
+            "**/[Oo]bj/**",
+            "**/.git/**",
+            "**/.template.config/**",
+            "artifacts/**",
+            "**/TestResults/**",
+            "**/*.user",
+            "**/*.suo"
+          ]
+        }
+      ]
+    }
+  ]
+}

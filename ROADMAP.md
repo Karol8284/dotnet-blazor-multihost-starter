@@ -1,36 +1,39 @@
 # Roadmap: dotnet-blazor-multihost-starter
 
-**Status:** V1 jest na `main`; security hardening V2 jest w toku na branchu
-`feature/oidc-secure-tasks`. API auth, owner isolation, pagination, rate
-limiting i host-specific MSAL sign-in code są zaimplementowane. Automatyczne
-testy przechodzą z testowymi identities; realny Entra sign-in i runtime smoke
-test obu hostów wymagają app registrations.
-**Data punktu odniesienia:** 2026-10-20
+**Status (2026-10-22):** `main` zawiera chroniony Tasks API, tryby
+server-centric/client-local/offline-hybrid, Web Interactive WebAssembly/Server
+oraz instalowalny template `dotnet new`. Jest to wciąż learning/reference
+starter, nie produkt produkcyjny. Realne logowanie Entra i runtime smoke testy
+na docelowych platformach pozostają bramką przed deklaracją gotowości
+produkcyjnej.
 
-## Aktualny dowód realizacji V1
+Etapy V1 poniżej zachowują pierwotny plan i uzasadnienie. Aktualne otwarte
+bramki są wymienione na końcu dokumentu.
 
-- Jedna solution zawiera hosty Web i MAUI, współdzieloną RCL, API, warstwy
-  Domain/Application/Infrastructure, kontrakty, klienta API i projekty testowe.
-- Moduł `Tasks` pokazuje pionowe slice'y listowania, pobrania, tworzenia i
-  ukończenia; oba hosty korzystają z jednej strony Razor i klienta HTTP.
-- Web hostuje WebAssembly oraz API z tego samego originu; MAUI korzysta z
-  konfigurowanego adresu API. W Web wyłączono prerender komponentów
-  interaktywnych, aby pobieranie danych rozpoczynało się w kliencie.
-- Lokalnie potwierdzono kompilację Release całej solution, build MAUI Windows
-  Release i Android Debug, formatowanie C# oraz 22 testy w czterech projektach.
-- [GitHub Actions CI](https://github.com/Karol8284/dotnet-blazor-multihost-starter/actions/runs/39484501308)
-  przeszedł na commicie `56d65ee`: build Web, testy, testy API z migracją na
-  PostgreSQL service oraz build MAUI Windows Release.
-- Testy API uruchomiono lokalnie na SQLite in-memory. Lokalny Docker nie był
-  dostępny; potwierdzenie na PostgreSQL pochodzi z GitHub Actions CI.
-- Pełny runtime smoke test w przeglądarce i w uruchomionej aplikacji MAUI nie
-  został wykonany. Kompilacja obu hostów i API/component tests nie zastępują
-  takiego sprawdzenia.
+## Aktualny stan i dowody
+
+- Jedna solution ma hosty Web i MAUI, wspólną RCL, API, Domain/Application/
+  Infrastructure, klienta, kontrakty i cztery projekty testowe.
+- `Tasks` pokazuje trzy jawne tryby danych. Offline sync używa IndexedDB,
+  wersjonowania, `409 Conflict` i jawnego rozstrzygnięcia.
+- Web wybiera `WebAssembly` lub `Server` przez `Web:Interactivity`; MAUI
+  pozostaje Blazor Hybrid.
+- Repozytorium jest instalowalne przez `dotnet new install .`; generator
+  zmienia nazwę projektu, app title, bundle ID i publiczne Entra IDs.
+- Lokalnie przechodzą 70 testów w czterech projektach, Release build solution,
+  Android Debug, Windows Release, formatowanie i kontrola snapshotu migracji.
+- Browser smoke potwierdził zapis/odczyt IndexedDB po przeładowaniu w
+  WebAssembly oraz Interactive Server. To nie obejmuje prawdziwego logowania.
+- Workflow CI jest skonfigurowany do testów API na PostgreSQL, buildów
+  Windows/Android oraz wygenerowania i budowania template'u.
+- Build/test nie weryfikują prawdziwego tenant logowania, IndexedDB w każdym
+  WebView ani iOS/Mac Catalyst. Nie deklaruj tych scenariuszy jako
+  przetestowanych bez osobnych runtime smoke testów.
 
 ## V2 — security baseline dla wieloplatformowego Tasks
 
-**Cel:** zastąpić anonimowy, współdzielony demo CRUD jednym chronionym,
-serwerowo-autorytatywnym przepływem używanym przez WebAssembly i MAUI.
+**Cel i rezultat:** zastąpiono anonimowy, współdzielony demo CRUD chronionym
+server-centric przepływem. API egzekwuje dostęp, a owner wynika z tożsamości.
 
 ### Przyjęte granice
 
@@ -41,16 +44,18 @@ serwerowo-autorytatywnym przepływem używanym przez WebAssembly i MAUI.
 - Wzorzec to Microsoft Entra ID + MSAL, Authorization Code + PKCE dla
   publicznych klientów, osobne client IDs dla Web i MAUI, bez client secrets
   w kodzie lub bundle.
-- Local-first preferences/drafts i hybrid offline write/sync są opisane, ale
-  nie są częścią bezpiecznego Tasks slice'a. Synchronizacja konfliktów wymaga
-  osobnego ADR i testów.
+- Client-local i offline-hybrid są osobnymi przykładami, a nie trybem
+  autoryzacji dla danych serwera. Lokalny IndexedDB nie jest miejscem na
+  sekrety ani wrażliwe dane.
+- Offline sync używa wersjonowania i ręcznego rozstrzygania konfliktów zgodnie
+  z [ADR-0003](./docs/adr/0003-data-modes-and-offline-conflicts.md).
 - Starsze anonimowe Tasks są przypisane do zarezerwowanego owner sentinel w
   migracji i nie są widoczne dla żadnego Entra usera.
 
 Szczegóły decyzji i ograniczeń platformowych opisuje
 [ADR-0002](./docs/adr/0002-authentication-and-execution-modes.md).
 
-### Definition of Done V2
+### Pozostałe bramki V2
 
 - API fail-closed w Development/Production, waliduje Entra tenant, issuer,
   audience, podpis/ważność tokenu, dozwolony `azp` i delegated scope.
@@ -58,14 +63,15 @@ Szczegóły decyzji i ograniczeń platformowych opisuje
   `tid` + `oid`; request body nie może nadpisać właściciela.
 - Testy obejmują anonymous `401`, brak scope/nieznanego clienta `403`,
   izolację A/B, odrzucone odczyty i mutacje cudzych danych.
-- Web i MAUI pobierają delegated API access token przez własne host adapters;
-  żaden secret ani token nie trafia do shared UI ani logów.
-- Release MAUI wymaga HTTPS; Web redirect i native redirect URIs są
-  konfigurowalne i udokumentowane.
-- Build/test CI przechodzi; runtime login/Web↔MAUI smoke test jest wykonany
-  przy skonfigurowanym Entra tenant.
-- Dokumentacja odróżnia gotowe server-centric flow od niewdrożonych
-  client-local i offline-hybrid przykładów.
+- WebAssembly i MAUI pobierają delegated API access token przez własne host
+  adapters; Interactive Server korzysta z OIDC cookie session i serwerowego
+  adaptera.
+- Release MAUI wymaga HTTPS; WebAssembly, Interactive Server i native redirect
+  URIs są rozdzielone i udokumentowane.
+- Pozostaje ręczny runtime login/Web↔MAUI smoke test z prawdziwym Entra tenant;
+  testowa identity handler nie jest jego zamiennikiem.
+- Weryfikacja IndexedDB na każdej deklarowanej platformie MAUI pozostaje osobną
+  bramką.
 
 ## Cel
 
@@ -109,9 +115,10 @@ ewentualny host API mogą być uruchamiane i wdrażane osobno.
 6. Testy logiki, API/persistence i wspólnych komponentów oraz CI dla
    zadeklarowanych targetów.
 
-Pierwsze wydanie nie obejmuje logowania, ról, e-maili, 2FA, wielu modułów
-biznesowych, offline sync, generatorów projektów ani wdrożenia produkcyjnego.
-Można je dodać później, jeśli pojawi się konkretny przypadek użycia.
+Pierwotny zakres V1 nie obejmował logowania, offline sync ani generatora
+projektów. Te elementy zostały dodane później w osobnych decyzjach ADR.
+Role, e-maile, 2FA, wiele modułów biznesowych i wdrożenie produkcyjne nadal
+pozostają poza zakresem.
 
 ## Proponowane granice projektów
 
@@ -258,7 +265,7 @@ oraz MAUI; logika nie jest kopiowana do dwóch zestawów stron.
 **Bramka wyjścia:** oba hosty używają tego samego API i bazy, a zmiana danych
 w jednym hoście jest widoczna w drugim po ponownym odczycie.
 
-### Etap 5 — jakość, dokumentacja i pierwsze wydanie
+### Etap 5 — jakość, dokumentacja i pierwsze wydanie (pierwotny plan V1)
 
 - CI na pull requestach: restore, Release build, unit tests, API integration
   tests, testy komponentów i publikacja/build Web.
@@ -270,9 +277,9 @@ w jednym hoście jest widoczna w drugim po ponownym odczycie.
 - Sprawdzić procedurę od zera: klon, restore, konfiguracja bazy, uruchomienie
   API/Web i uruchomienie MAUI.
 
-**Bramka wydania V1:** wszystkie kroki Definition of Done poniżej przechodzą
-na czystym checkoutcie. Status „produkcyjny” nie jest deklarowany bez osobnego
-zakresu bezpieczeństwa, wdrożenia i operacji.
+**Bramka pierwotnego V1:** była to bramka dla hostów i server-centric Tasks.
+Późniejsze tryby danych, generator template'u i rzeczywiste logowanie mają
+osobne bramki w aktualnym stanie powyżej.
 
 ## Definition of Done V1
 
@@ -287,18 +294,18 @@ zakresu bezpieczeństwa, wdrożenia i operacji.
 - Nie ma przypadkowo dodanych sekretów ani nieużywanych funkcji skopiowanych z
   większego startera.
 
-## Poza V1 — możliwe kolejne decyzje
+## Otwarte bramki przed deklaracją gotowości produkcyjnej
 
-Rozważać dopiero po użyciu pierwszego przepływu:
-
-- natywne funkcje urządzeń (np. storage, kamera, powiadomienia);
-- offline i synchronizacja;
-- rate limiting/paginacja dla większych zbiorów, jeśli będzie to wymagane przez
-  charakter docelowej aplikacji;
-- kolejne moduły biznesowe, worker/outbox lub pliki;
-- pełne E2E dla urządzeń, deployment, telemetry i observability;
-- template/source generator, jeśli powstaną co najmniej dwa rzeczywiste
-  przepływy i będzie wiadomo, co warto automatyzować.
+- Wykonać realny sign-in i sign-out dla WebAssembly, Interactive Server oraz
+  każdej docelowej platformy MAUI z własnymi rejestracjami Entra.
+- Sprawdzić IndexedDB w przeglądarce i WebView na urządzeniach, w tym
+  zachowanie po restarcie aplikacji i utracie połączenia.
+- Dodać i przetestować deployment, telemetry/observability oraz limity
+  rozproszone, jeśli aplikacja ma działać w wielu instancjach.
+- Rozważać dodatkowych providerów identity/bazy tylko przy konkretnym
+  przypadku użycia; obecny template pozostaje Entra + PostgreSQL.
+- Dodawać kolejne moduły biznesowe dopiero wtedy, gdy pokażą wartość wzorca
+  VSA poza przykładowym Tasks.
 
 ## Źródła
 

@@ -1,4 +1,6 @@
-﻿<!DOCTYPE html>
+﻿@using BlazorMultihostStarter.Web.Configuration
+@inject IConfiguration Configuration
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -8,13 +10,18 @@
     <link rel="stylesheet" href="_content/BlazorMultihostStarter.Shared/app.css" />
     <link rel="stylesheet" href="BlazorMultihostStarter.Web.styles.css" />
     <link rel="icon" type="image/png" href="_content/BlazorMultihostStarter.Shared/favicon.png" />
-    <HeadOutlet @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+    <HeadOutlet @rendermode="InteractiveMode" />
 </head>
 
 <body>
-    <BlazorMultihostStarter.Web.Client.ClientRoutes
-        @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+    <BlazorMultihostStarter.Web.Client.ClientRoutes @rendermode="InteractiveMode" />
+    <script src="_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js"></script>
     <script src="_framework/blazor.web.js"></script>
 </body>
 
 </html>
+
+@code {
+    private IComponentRenderMode InteractiveMode =>
+        WebInteractivityMode.GetRenderMode(Configuration["Web:Interactivity"]);
+}

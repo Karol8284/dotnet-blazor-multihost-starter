@@ -1,6 +1,6 @@
 ﻿@page "/"
 @using System.Net
-@inject ITasksApiClient TasksApiClient
+@inject ITasksClient TasksApiClient
 @inject IUserAuthenticationSession AuthenticationSession
 
 <PageTitle>Tasks | Blazor Multihost Starter</PageTitle>
@@ -10,7 +10,7 @@
         <p class="eyebrow">Shared by Web and MAUI</p>
         <h1 id="tasks-heading">Your tasks</h1>
         <p class="page-description">
-            A small end-to-end example: both hosts use the same UI, API, and PostgreSQL database.
+            Server-centric example: PostgreSQL is authoritative; WebAssembly and MAUI use the API, while Interactive Server invokes the same application use cases.
         </p>
         @if (_isAuthenticated)
         {
@@ -335,6 +335,11 @@
         if (statusCode == HttpStatusCode.NotFound)
         {
             return "The task no longer exists. Refresh the list and try again.";
+        }
+
+        if (statusCode == HttpStatusCode.Conflict)
+        {
+            return "The task changed on the server. Refresh the list before retrying.";
         }
 
         if ((int)statusCode >= 500)

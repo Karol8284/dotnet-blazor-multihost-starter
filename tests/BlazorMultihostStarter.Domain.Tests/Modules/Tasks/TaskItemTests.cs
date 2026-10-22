@@ -51,10 +51,24 @@ public sealed class TaskItemTests
         var completedAt = DateTimeOffset.UtcNow.AddMinutes(1);
 
         task.Complete(completedAt);
+        var versionAfterFirstCompletion = task.Version;
         task.Complete(completedAt.AddMinutes(1));
 
         Assert.True(task.IsCompleted);
         Assert.Equal(completedAt, task.CompletedAtUtc);
+        Assert.Equal(versionAfterFirstCompletion, task.Version);
+    }
+
+    [Fact]
+    public void Mutations_increment_the_server_version_only_when_state_changes()
+    {
+        var task = TaskItem.Create("Initial title", OwnerId, DateTimeOffset.UtcNow);
+
+        task.Rename("Updated title");
+        task.Rename("Updated title");
+        task.Complete(DateTimeOffset.UtcNow);
+
+        Assert.Equal(3, task.Version);
     }
 
     [Theory]

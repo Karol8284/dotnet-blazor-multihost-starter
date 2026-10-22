@@ -20,8 +20,8 @@ public static class EntraApiAuthentication
                 "Configure valid TenantId, ApiClientId, WebClientId, and MauiClientId values in Authentication:Entra.")
             .ValidateOnStart();
 
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer();
+        services.AddAuthentication()
+            .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme);
 
         services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
             .Configure<IOptions<EntraApiOptions>>((jwtOptions, entraOptions) =>
@@ -48,6 +48,7 @@ public static class EntraApiAuthentication
         {
             authorization.AddPolicy(TasksUserPolicy, policy =>
             {
+                policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme);
                 policy.RequireAuthenticatedUser();
                 policy.AddRequirements(new TasksApiAuthorizationRequirement());
             });

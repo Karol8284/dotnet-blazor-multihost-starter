@@ -17,6 +17,9 @@ public sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
         builder.Property(task => task.Title)
             .HasMaxLength(120)
             .IsRequired();
+        builder.Property(task => task.Version)
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
         builder.Property(task => task.CreatedAtUtc).IsRequired();
         builder.Property(task => task.IsCompleted).IsRequired();
         builder.Property(task => task.CompletedAtUtc);

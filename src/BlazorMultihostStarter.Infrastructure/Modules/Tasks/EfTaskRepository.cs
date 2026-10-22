@@ -33,6 +33,25 @@ public sealed class EfTaskRepository(StarterDbContext dbContext) : ITaskReposito
             cancellationToken);
     }
 
+    public Task<TaskItem?> FindAnyByIdAsync(Guid id, CancellationToken cancellationToken)
+    {
+        return dbContext.Tasks.SingleOrDefaultAsync(
+            task => task.Id == id,
+            cancellationToken);
+    }
+
+    public Task<TaskItem?> FindCurrentByIdAsync(
+        Guid id,
+        string ownerId,
+        CancellationToken cancellationToken)
+    {
+        return dbContext.Tasks
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                task => task.Id == id && task.OwnerId == ownerId,
+                cancellationToken);
+    }
+
     public async Task AddAsync(TaskItem task, CancellationToken cancellationToken)
     {
         await dbContext.Tasks.AddAsync(task, cancellationToken);
@@ -40,6 +59,24 @@ public sealed class EfTaskRepository(StarterDbContext dbContext) : ITaskReposito
 
     public Task SaveChangesAsync(CancellationToken cancellationToken)
     {
-        return dbContext.SaveChangesAsync(cancellationToken);
+        return SaveChangesCoreAsync(cancellationToken);
+    }
+
+    private async Task SaveChangesCoreAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            var taskId = exception.Entries
+                .Select(entry => entry.Entity)
+                .OfType<TaskItem>()
+                .Select(task => task.Id)
+                .FirstOrDefault();
+
+            throw new TaskConcurrencyException(taskId, exception);
+        }
     }
 }

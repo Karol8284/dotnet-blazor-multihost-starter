@@ -1,0 +1,180 @@
+@page "/tasks/local"
+@inject ILocalTasksClient LocalTasks
+
+<PageTitle>Client-local tasks | Blazor Multihost Starter</PageTitle>
+
+<section class="mode-page" aria-labelledby="local-heading">
+    <div class="mode-heading">
+        <p class="eyebrow">Data mode · client-local</p>
+        <h1 id="local-heading">Tasks on this device</h1>
+        <p>Stored in this browser or app WebView using IndexedDB. Nothing is sent to the API or shared with another device.</p>
+    </div>
+
+    @if (_errorMessage is not null)
+    {
+        <div class="error-panel" role="alert">@_errorMessage</div>
+    }
+
+    <form class="mode-form" @onsubmit="CreateAsync" @onsubmit:preventDefault>
+        <label for="local-task-title">Add a local task</label>
+        <div class="mode-input-row">
+            <input id="local-task-title" @bind="_newTitle" @bind:event="oninput" maxlength="120" />
+            <button class="primary-button" type="submit" disabled="@_isSaving">Add</button>
+        </div>
+    </form>
+
+    <section class="mode-panel" aria-labelledby="local-list-heading">
+        <div class="mode-list-heading">
+            <h2 id="local-list-heading">Local task list</h2>
+            <span>@_tasks.Count</span>
+        </div>
+        @if (!_loaded)
+        {
+            <p role="status">Loading local tasks…</p>
+        }
+        else if (_tasks.Count == 0)
+        {
+            <p class="empty-state">No local tasks yet.</p>
+        }
+        else
+        {
+            <ul class="mode-list">
+                @foreach (var record in _tasks)
+                {
+                    <li class="mode-row">
+                        <div class="mode-task-copy">
+                            <input aria-label="@($"Title for {record.Task.Title}")"
+                                   @bind="_editTitles[record.Task.Id]"
+                                   @bind:event="oninput"
+                                   maxlength="120"
+                                   disabled="@_isSaving" />
+                            <small>Only this browser or device · @record.Task.CreatedAtUtc.ToLocalTime().ToString("g")</small>
+                        </div>
+                        <div class="mode-actions">
+                            <button class="text-button" type="button" disabled="@_isSaving" @onclick="() => RenameAsync(record.Task.Id)">Save title</button>
+                            @if (!record.Task.IsCompleted)
+                            {
+                                <button class="text-button" type="button" disabled="@_isSaving" @onclick="() => CompleteAsync(record.Task.Id)">Complete</button>
+                            }
+                            else
+                            {
+                                <span class="status-badge">Completed</span>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+</section>
+
+@code {
+    private IReadOnlyList<LocalTaskRecord> _tasks = [];
+    private readonly Dictionary<Guid, string> _editTitles = [];
+    private string _newTitle = string.Empty;
+    private string? _errorMessage;
+    private bool _loaded;
+    private bool _isSaving;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await RefreshAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        try
+        {
+            _tasks = await LocalTasks.ListAsync();
+            _editTitles.Clear();
+            foreach (var record in _tasks)
+            {
+                _editTitles[record.Task.Id] = record.Task.Title;
+            }
+            _errorMessage = null;
+        }
+        catch (JSException)
+        {
+            _errorMessage = "The local IndexedDB store could not be opened. Check browser or WebView storage permissions.";
+        }
+        finally
+        {
+            _loaded = true;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _isSaving = true;
+        try
+        {
+            await LocalTasks.CreateAsync(_newTitle);
+            _newTitle = string.Empty;
+            await RefreshAsync();
+        }
+        catch (TaskApiValidationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (JSException)
+        {
+            _errorMessage = "The local task could not be saved to IndexedDB.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task CompleteAsync(Guid id)
+    {
+        _isSaving = true;
+        try
+        {
+            await LocalTasks.CompleteAsync(id);
+            await RefreshAsync();
+        }
+        catch (HttpRequestException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (JSException)
+        {
+            _errorMessage = "The completion state could not be saved locally.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task RenameAsync(Guid id)
+    {
+        _isSaving = true;
+        try
+        {
+            await LocalTasks.RenameAsync(id, _editTitles.GetValueOrDefault(id));
+            await RefreshAsync();
+        }
+        catch (TaskApiValidationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (HttpRequestException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (JSException)
+        {
+            _errorMessage = "The title could not be saved locally.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

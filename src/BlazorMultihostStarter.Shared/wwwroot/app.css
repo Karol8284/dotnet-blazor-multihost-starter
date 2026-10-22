@@ -50,3 +50,135 @@ button:disabled {
     cursor: wait;
     opacity: 0.7;
 }
+
+.mode-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+    margin-left: auto;
+}
+
+.mode-nav a {
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 650;
+    text-decoration: none;
+}
+
+.mode-page {
+    max-width: 54rem;
+    margin-inline: auto;
+}
+
+.mode-heading {
+    margin-bottom: 1.5rem;
+}
+
+.mode-heading p:last-child {
+    max-width: 44rem;
+    color: var(--muted);
+    line-height: 1.55;
+}
+
+.mode-form,
+.mode-panel {
+    margin-bottom: 1rem;
+    padding: 1.15rem;
+    border: 1px solid var(--border);
+    border-radius: 0.9rem;
+    background: var(--surface);
+}
+
+.mode-form label {
+    display: block;
+    margin-bottom: 0.55rem;
+    font-weight: 650;
+}
+
+.mode-input-row {
+    display: flex;
+    gap: 0.65rem;
+}
+
+.mode-input-row input,
+.mode-task-copy input {
+    min-width: 0;
+    flex: 1;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #cfd7e3;
+    border-radius: 0.55rem;
+    color: var(--ink);
+    background: #fff;
+}
+
+.mode-list-heading,
+.mode-row,
+.mode-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+}
+
+.mode-list-heading {
+    margin-bottom: 0.65rem;
+}
+
+.mode-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.mode-row {
+    padding-block: 0.9rem;
+    border-top: 1px solid var(--border);
+}
+
+.mode-row-stacked {
+    flex-wrap: wrap;
+}
+
+.mode-task-copy {
+    display: grid;
+    flex: 1;
+    gap: 0.35rem;
+    min-width: min(100%, 18rem);
+}
+
+.mode-task-copy small {
+    color: var(--muted);
+}
+
+.sync-conflict {
+    flex-basis: 100%;
+    padding: 0.75rem;
+    border-radius: 0.6rem;
+    background: #fff8e6;
+}
+
+.sync-conflict p {
+    margin: 0 0 0.5rem;
+}
+
+.sync-message {
+    padding: 0.65rem;
+    border-radius: 0.6rem;
+    color: #067647;
+    background: #ecfdf3;
+}
+
+@media (max-width: 620px) {
+    .mode-nav {
+        order: 3;
+        flex-basis: 100%;
+        margin-left: 0;
+    }
+
+    .mode-input-row,
+    .mode-row,
+    .mode-list-heading {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}

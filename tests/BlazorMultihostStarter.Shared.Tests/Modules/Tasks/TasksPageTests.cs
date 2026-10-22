@@ -14,7 +14,7 @@ public sealed class TasksPageTests
     public void Renders_empty_state_when_api_has_no_tasks()
     {
         using var context = new BunitContext();
-        context.Services.AddSingleton<ITasksApiClient>(new FakeTasksApiClient());
+        context.Services.AddSingleton<ITasksClient>(new FakeTasksApiClient());
         context.Services.AddSingleton<IUserAuthenticationSession>(new FakeAuthenticationSession());
 
         var cut = context.Render<TasksPage>();
@@ -28,7 +28,7 @@ public sealed class TasksPageTests
     public void Shows_api_unavailable_message_when_initial_load_fails()
     {
         using var context = new BunitContext();
-        context.Services.AddSingleton<ITasksApiClient>(new FakeTasksApiClient(failRequests: true));
+        context.Services.AddSingleton<ITasksClient>(new FakeTasksApiClient(failRequests: true));
         context.Services.AddSingleton<IUserAuthenticationSession>(new FakeAuthenticationSession());
 
         var cut = context.Render<TasksPage>();
@@ -41,7 +41,7 @@ public sealed class TasksPageTests
     public void Explains_server_errors_instead_of_suggesting_the_host_is_offline()
     {
         using var context = new BunitContext();
-        context.Services.AddSingleton<ITasksApiClient>(
+        context.Services.AddSingleton<ITasksClient>(
             new FakeTasksApiClient(failureStatus: HttpStatusCode.InternalServerError));
         context.Services.AddSingleton<IUserAuthenticationSession>(new FakeAuthenticationSession());
 
@@ -55,7 +55,7 @@ public sealed class TasksPageTests
     public void Explains_rate_limit_responses()
     {
         using var context = new BunitContext();
-        context.Services.AddSingleton<ITasksApiClient>(
+        context.Services.AddSingleton<ITasksClient>(
             new FakeTasksApiClient(failureStatus: HttpStatusCode.TooManyRequests));
         context.Services.AddSingleton<IUserAuthenticationSession>(new FakeAuthenticationSession());
 
@@ -69,7 +69,7 @@ public sealed class TasksPageTests
     {
         using var context = new BunitContext();
         var apiClient = new FakeTasksApiClient();
-        context.Services.AddSingleton<ITasksApiClient>(apiClient);
+        context.Services.AddSingleton<ITasksClient>(apiClient);
         context.Services.AddSingleton<IUserAuthenticationSession>(new FakeAuthenticationSession());
 
         var cut = context.Render<TasksPage>();
@@ -87,7 +87,7 @@ public sealed class TasksPageTests
         using var context = new BunitContext();
         var apiClient = new FakeTasksApiClient();
         var authentication = new FakeAuthenticationSession(isSignedIn: false);
-        context.Services.AddSingleton<ITasksApiClient>(apiClient);
+        context.Services.AddSingleton<ITasksClient>(apiClient);
         context.Services.AddSingleton<IUserAuthenticationSession>(authentication);
 
         var cut = context.Render<TasksPage>();
@@ -117,7 +117,7 @@ public sealed class TasksPageTests
                 null));
         }
 
-        context.Services.AddSingleton<ITasksApiClient>(apiClient);
+        context.Services.AddSingleton<ITasksClient>(apiClient);
         context.Services.AddSingleton<IUserAuthenticationSession>(new FakeAuthenticationSession());
 
         var cut = context.Render<TasksPage>();
@@ -143,7 +143,7 @@ public sealed class TasksPageTests
 
     private sealed class FakeTasksApiClient(
         bool failRequests = false,
-        HttpStatusCode? failureStatus = null) : ITasksApiClient
+        HttpStatusCode? failureStatus = null) : ITasksClient
     {
         public List<TaskResponse> Tasks { get; } = [];
 
@@ -209,6 +209,17 @@ public sealed class TasksPageTests
             };
             return Task.FromResult(Tasks[index]);
         }
+
+        public Task<TaskSyncResult> SyncAsync(
+            SyncTaskRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            var task = Tasks.SingleOrDefault(item => item.Id == request.Id);
+            return Task.FromResult<TaskSyncResult>(
+                task is null
+                    ? new TaskSyncResult.Missing()
+                    : new TaskSyncResult.Applied(task));
+        }
     }
 
     private sealed class FakeAuthenticationSession(bool isSignedIn = true)
@@ -218,11 +229,6 @@ public sealed class TasksPageTests
 
         public Task<bool> IsSignedInAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(IsSignedIn);
-
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken = default) =>
-            IsSignedIn
-                ? Task.FromResult("test-access-token")
-                : Task.FromException<string>(new AuthenticationRequiredException());
 
         public Task SignInAsync(CancellationToken cancellationToken = default)
         {

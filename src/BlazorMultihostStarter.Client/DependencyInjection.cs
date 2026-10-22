@@ -16,7 +16,7 @@ public static class DependencyInjection
         }
 
         services.AddScoped(_ => new HttpClient { BaseAddress = apiBaseAddress });
-        services.AddScoped<ITasksApiClient, TasksApiClient>();
+        services.AddScoped<ITasksClient, TasksApiClient>();
 
         return services;
     }

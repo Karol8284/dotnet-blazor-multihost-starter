@@ -3,6 +3,7 @@ using BlazorMultihostStarter.Application.Modules.Tasks.CompleteTask;
 using BlazorMultihostStarter.Application.Modules.Tasks.CreateTask;
 using BlazorMultihostStarter.Application.Modules.Tasks.GetTask;
 using BlazorMultihostStarter.Application.Modules.Tasks.ListTasks;
+using BlazorMultihostStarter.Application.Modules.Tasks.SyncTask;
 using BlazorMultihostStarter.Domain.Modules.Tasks;
 
 namespace BlazorMultihostStarter.Application.Tests.Modules.Tasks;
@@ -155,6 +156,69 @@ public sealed class TaskHandlersTests
         Assert.Equal(0, repository.SaveChangesCount);
     }
 
+    [Fact]
+    public async Task Sync_creates_and_retries_a_client_generated_task_idempotently()
+    {
+        var repository = new FakeTaskRepository();
+        var taskId = Guid.NewGuid();
+        var request = new SyncTaskCommand(taskId, "Created offline", false, 0);
+        var handler = new SyncTaskHandler(
+            repository,
+            new FixedTimeProvider(DateTimeOffset.UtcNow));
+
+        var first = await handler.HandleAsync(taskId, request, OwnerId, CancellationToken.None);
+        var retry = await handler.HandleAsync(taskId, request, OwnerId, CancellationToken.None);
+
+        var firstTask = Assert.IsType<TaskSyncOutcome.Succeeded>(first).Task;
+        var retryTask = Assert.IsType<TaskSyncOutcome.Succeeded>(retry).Task;
+        Assert.Equal(taskId, firstTask.Id);
+        Assert.Equal(firstTask, retryTask);
+        Assert.Equal(1, firstTask.Version);
+        Assert.Single(repository.Items);
+    }
+
+    [Fact]
+    public async Task Sync_returns_server_snapshot_for_stale_local_version()
+    {
+        var task = TaskItem.Create("Server title", OwnerId, DateTimeOffset.UtcNow);
+        var repository = new FakeTaskRepository();
+        repository.Items.Add(task);
+        var handler = new SyncTaskHandler(
+            repository,
+            new FixedTimeProvider(DateTimeOffset.UtcNow));
+
+        var result = await handler.HandleAsync(
+            task.Id,
+            new SyncTaskCommand(task.Id, "Local title", false, BaseVersion: 0),
+            OwnerId,
+            CancellationToken.None);
+
+        var conflict = Assert.IsType<TaskSyncOutcome.Conflict>(result);
+        Assert.Equal("Server title", conflict.ServerTask.Title);
+        Assert.Equal(0, repository.SaveChangesCount);
+    }
+
+    [Fact]
+    public async Task Sync_does_not_find_tasks_owned_by_another_user()
+    {
+        var task = TaskItem.Create("Other user's task", "tenant-a:user-2", DateTimeOffset.UtcNow);
+        var repository = new FakeTaskRepository();
+        repository.Items.Add(task);
+        var handler = new SyncTaskHandler(
+            repository,
+            new FixedTimeProvider(DateTimeOffset.UtcNow));
+
+        var result = await handler.HandleAsync(
+            task.Id,
+            new SyncTaskCommand(task.Id, "Take over", false, BaseVersion: 1),
+            OwnerId,
+            CancellationToken.None);
+
+        Assert.IsType<TaskSyncOutcome.Missing>(result);
+        Assert.Equal("Other user's task", task.Title);
+        Assert.Equal(0, repository.SaveChangesCount);
+    }
+
     private sealed class FakeTaskRepository : ITaskRepository
     {
         public List<TaskItem> Items { get; } = [];
@@ -178,6 +242,19 @@ public sealed class TaskHandlersTests
         {
             return Task.FromResult(Items.SingleOrDefault(
                 task => task.Id == id && task.OwnerId == ownerId));
+        }
+
+        public Task<TaskItem?> FindAnyByIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Items.SingleOrDefault(task => task.Id == id));
+        }
+
+        public Task<TaskItem?> FindCurrentByIdAsync(
+            Guid id,
+            string ownerId,
+            CancellationToken cancellationToken)
+        {
+            return FindByIdAsync(id, ownerId, cancellationToken);
         }
 
         public Task AddAsync(TaskItem task, CancellationToken cancellationToken)

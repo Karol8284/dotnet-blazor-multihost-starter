@@ -23,6 +23,40 @@ public sealed class TasksEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
         Assert.Contains("_framework/blazor.web.js", html, StringComparison.Ordinal);
+        Assert.Contains(
+            "_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js",
+            html,
+            StringComparison.Ordinal);
+
+        using var authScriptResponse = await client.GetAsync(
+            "/_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js");
+        Assert.Equal(HttpStatusCode.OK, authScriptResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Web_host_can_select_interactive_server_when_configured()
+    {
+        await using var factory = new TasksApiFactory(useInteractiveServer: true);
+        await factory.InitializeDatabaseAsync();
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("_framework/blazor.web.js", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Interactive_server_mode_does_not_weaken_API_bearer_authorization()
+    {
+        await using var factory = new TasksApiFactory(useInteractiveServer: true);
+        await factory.InitializeDatabaseAsync();
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/api/tasks");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -218,6 +252,104 @@ public sealed class TasksEndpointTests
 
         using var invalidPage = await client.GetAsync("/api/tasks?page=0&pageSize=101");
         Assert.Equal(HttpStatusCode.BadRequest, invalidPage.StatusCode);
+    }
+
+    [Fact]
+    public async Task Sync_creates_a_client_task_and_retries_idempotently()
+    {
+        await using var factory = new TasksApiFactory();
+        await factory.InitializeDatabaseAsync();
+        using var client = CreateAuthenticatedClient(factory, UserA);
+        var taskId = Guid.NewGuid();
+        var request = new SyncTaskRequest(taskId, "Created offline", false, 0);
+
+        using var firstResponse = await client.PutAsJsonAsync(
+            $"/api/tasks/{taskId}/sync",
+            request);
+        var firstTask = await firstResponse.Content.ReadFromJsonAsync<TaskResponse>();
+        Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
+        Assert.Equal($"/api/tasks/{taskId}", firstResponse.Headers.Location?.OriginalString);
+        Assert.NotNull(firstTask);
+        Assert.Equal(taskId, firstTask.Id);
+        Assert.Equal(1, firstTask.Version);
+
+        using var retryResponse = await client.PutAsJsonAsync(
+            $"/api/tasks/{taskId}/sync",
+            request);
+        var retryTask = await retryResponse.Content.ReadFromJsonAsync<TaskResponse>();
+
+        Assert.Equal(HttpStatusCode.OK, retryResponse.StatusCode);
+        Assert.NotNull(retryTask);
+        Assert.Equal(firstTask.Id, retryTask.Id);
+        Assert.Equal(firstTask.Title, retryTask.Title);
+        Assert.Equal(firstTask.Version, retryTask.Version);
+    }
+
+    [Fact]
+    public async Task Sync_returns_server_snapshot_when_base_version_is_stale()
+    {
+        await using var factory = new TasksApiFactory();
+        await factory.InitializeDatabaseAsync();
+        using var client = CreateAuthenticatedClient(factory, UserA);
+        using var createResponse = await client.PostAsJsonAsync(
+            "/api/tasks",
+            new CreateTaskRequest("Server title"));
+        var created = await createResponse.Content.ReadFromJsonAsync<TaskResponse>();
+        Assert.NotNull(created);
+
+        using var response = await client.PutAsJsonAsync(
+            $"/api/tasks/{created.Id}/sync",
+            new SyncTaskRequest(created.Id, "Offline title", false, BaseVersion: 0));
+        var conflict = await response.Content.ReadFromJsonAsync<TaskSyncConflictResponse>();
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.NotNull(conflict);
+        Assert.Equal("Server title", conflict.ServerTask.Title);
+        Assert.Equal(created.Version, conflict.ServerTask.Version);
+    }
+
+    [Fact]
+    public async Task Sync_applies_local_snapshot_when_version_matches()
+    {
+        await using var factory = new TasksApiFactory();
+        await factory.InitializeDatabaseAsync();
+        using var client = CreateAuthenticatedClient(factory, UserA);
+        using var createResponse = await client.PostAsJsonAsync(
+            "/api/tasks",
+            new CreateTaskRequest("Before offline edit"));
+        var created = await createResponse.Content.ReadFromJsonAsync<TaskResponse>();
+        Assert.NotNull(created);
+
+        using var response = await client.PutAsJsonAsync(
+            $"/api/tasks/{created.Id}/sync",
+            new SyncTaskRequest(created.Id, "After offline edit", true, created.Version));
+        var updated = await response.Content.ReadFromJsonAsync<TaskResponse>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(updated);
+        Assert.Equal("After offline edit", updated.Title);
+        Assert.True(updated.IsCompleted);
+        Assert.Equal(created.Version + 2, updated.Version);
+    }
+
+    [Fact]
+    public async Task Sync_does_not_reveal_or_modify_another_users_task()
+    {
+        await using var factory = new TasksApiFactory();
+        await factory.InitializeDatabaseAsync();
+        using var userA = CreateAuthenticatedClient(factory, UserA);
+        using var userB = CreateAuthenticatedClient(factory, UserB);
+        using var createResponse = await userA.PostAsJsonAsync(
+            "/api/tasks",
+            new CreateTaskRequest("Private task"));
+        var created = await createResponse.Content.ReadFromJsonAsync<TaskResponse>();
+        Assert.NotNull(created);
+
+        using var response = await userB.PutAsJsonAsync(
+            $"/api/tasks/{created.Id}/sync",
+            new SyncTaskRequest(created.Id, "Attempted takeover", false, created.Version));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     private static HttpClient CreateAuthenticatedClient(

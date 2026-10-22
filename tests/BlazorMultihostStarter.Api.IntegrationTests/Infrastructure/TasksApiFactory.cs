@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
@@ -16,9 +17,15 @@ namespace BlazorMultihostStarter.Api.IntegrationTests.Infrastructure;
 
 public sealed class TasksApiFactory : WebApplicationFactory<Program>
 {
+    private readonly bool _useInteractiveServer;
     private readonly bool _usePostgreSql = !string.IsNullOrWhiteSpace(
         Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION"));
     private readonly SqliteConnection _sqliteConnection = new("Data Source=:memory:");
+
+    public TasksApiFactory(bool useInteractiveServer = false)
+    {
+        _useInteractiveServer = useInteractiveServer;
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -35,7 +42,10 @@ public sealed class TasksApiFactory : WebApplicationFactory<Program>
                 ["Authentication:Entra:ApiClientId"] = TestAuthenticationHandler.ApiClientId,
                 ["Authentication:Entra:WebClientId"] = TestAuthenticationHandler.WebClientId,
                 ["Authentication:Entra:MauiClientId"] = TestAuthenticationHandler.MauiClientId,
-                ["Authentication:Entra:ApiScopeName"] = "Tasks.ReadWrite"
+                ["Authentication:Entra:ApiScopeName"] = "Tasks.ReadWrite",
+                ["Authentication:Entra:ServerClientId"] = "55555555-5555-4555-8555-555555555555",
+                ["Authentication:Entra:ServerClientSecret"] = "test-only-placeholder",
+                ["Web:Interactivity"] = _useInteractiveServer ? "Server" : "WebAssembly"
             });
         });
         builder.ConfigureTestServices(services =>
@@ -72,6 +82,17 @@ public sealed class TasksApiFactory : WebApplicationFactory<Program>
             .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
                 TestAuthenticationHandler.SchemeName,
                 _ => { });
+
+            services.PostConfigure<AuthorizationOptions>(options =>
+            {
+                var originalPolicy = options.GetPolicy(EntraApiAuthentication.TasksUserPolicy)
+                    ?? throw new InvalidOperationException("The Tasks API policy is not registered.");
+                var testPolicy = new AuthorizationPolicyBuilder(TestAuthenticationHandler.SchemeName)
+                    .RequireAuthenticatedUser()
+                    .AddRequirements(originalPolicy.Requirements.ToArray())
+                    .Build();
+                options.AddPolicy(EntraApiAuthentication.TasksUserPolicy, testPolicy);
+            });
         });
     }
 

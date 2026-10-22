@@ -34,7 +34,7 @@ public sealed class MauiEntraOptions
 
 public static class MauiEntraRegistration
 {
-    public const string ClientId = "00000000-0000-0000-0000-000000000000";
+    public const string ClientId = "__MAUI_CLIENT_ID__";
 
     public const string BundleIdentifier = "com.example.blazormultihoststarter";
 

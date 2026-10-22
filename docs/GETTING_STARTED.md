@@ -13,6 +13,34 @@ dotnet --version
 dotnet workload list
 ```
 
+## Generate a project
+
+From this repository's root, install the template:
+
+```powershell
+dotnet new install .
+```
+
+Generate a project with a new name and app identifiers:
+
+```powershell
+dotnet new blazor-multihost-starter `
+  --name ContosoTasks `
+  --appTitle "Contoso Tasks" `
+  --mauiBundleId com.contoso.tasks `
+  --tenantId <tenant-guid> `
+  --apiClientId <api-client-guid> `
+  --webClientId <web-client-guid> `
+  --mauiClientId <maui-client-guid> `
+  --serverClientId <server-client-guid>
+```
+
+The public Entra IDs may be omitted while exploring source, but unresolved
+placeholders deliberately fail authentication validation. The template creates
+new User Secrets and MAUI application GUIDs. It never accepts a client secret
+as a template argument. All data-mode examples are included; choose by route
+and remove examples the application does not need.
+
 ## Start PostgreSQL
 
 Copy `.env.example` to `.env`, then start the local database:
@@ -22,20 +50,20 @@ Copy-Item .\.env.example .\.env
 docker compose up -d --wait postgres
 ```
 
-The committed development connection string matches the sample Compose
-credentials and connects to host port `5433` (the container listens on `5432`).
-Port `5433` avoids conflicting with a PostgreSQL server already listening on
-the host's default port. The credentials are disposable local-development
-values, not production secrets. Do not reuse them outside a local machine.
+The development connection string matches the sample Compose credentials and
+connects to host port `5433` (the container listens on `5432`). Port `5433`
+avoids conflicts with a PostgreSQL server on the default port. These credentials
+are disposable local-development values, not production secrets.
 
-## Apply migrations and run Web/API
+## Configure Entra
 
-Register an Entra API application with a delegated `Tasks.ReadWrite` scope,
-plus Web SPA and MAUI public-client registrations. Grant both clients the
-delegated API scope. Do not create client secrets for the public clients.
+Register an Entra API application with a delegated `Tasks.ReadWrite` scope, a
+WebAssembly SPA client, and a MAUI public client. Grant both public clients the
+API scope. Public clients must not have a client secret. Interactive Server
+additionally requires a confidential Web client with the OIDC callback
+`http://localhost:5080/signin-oidc`.
 
-Set the API's Entra configuration in User Secrets (IDs are public values, but
-keeping per-developer configuration out of tracked settings is convenient):
+Set server-side public identifiers using User Secrets:
 
 ```powershell
 $webProject = '.\src\BlazorMultihostStarter.Web\BlazorMultihostStarter.Web.csproj'
@@ -45,20 +73,33 @@ dotnet user-secrets set 'Authentication:Entra:WebClientId' '<web-client-guid>' -
 dotnet user-secrets set 'Authentication:Entra:MauiClientId' '<maui-client-guid>' --project $webProject
 ```
 
-Add the same public tenant/API IDs to
-`src/BlazorMultihostStarter.Web.Client/wwwroot/appsettings.Development.json`
-and `src/BlazorMultihostStarter.Maui/Resources/Raw/appsettings.json`, with the
-appropriate public client ID and API scope for each client. The MAUI client ID
-must also match `MauiEntraRegistration.ClientId` in
-`src/BlazorMultihostStarter.Maui/Authentication/MauiEntraOptions.cs`. Register
-the Web redirect `http://localhost:5080/authentication/login-callback`, the
-Android redirect `msal<MAUI_CLIENT_ID>://auth`, the iOS redirect
-`msauth.com.example.blazormultihoststarter://auth`, and the Windows broker
-redirect `ms-appx-web://microsoft.aad.brokerplugin/<MAUI_CLIENT_ID>`. Match
-the Android intent filter and iOS/Mac Catalyst URL schemes in the platform
-files to the registered MAUI client ID and bundle ID.
+For Interactive Server, also set the confidential client values:
 
-Run the remaining commands from the repository root:
+```powershell
+dotnet user-secrets set 'Authentication:Entra:ServerClientId' '<server-client-guid>' --project $webProject
+dotnet user-secrets set 'Authentication:Entra:ServerClientSecret' '<server-client-secret>' --project $webProject
+```
+
+Set WebAssembly public values in
+`src/BlazorMultihostStarter.Web.Client/wwwroot/appsettings.Development.json`
+and MAUI values in
+`src/BlazorMultihostStarter.Maui/Resources/Raw/appsettings.json`. The MAUI
+client ID must match `MauiEntraRegistration.ClientId`.
+
+Set `Web:Interactivity` in
+`src/BlazorMultihostStarter.Web/appsettings.Development.json` to `WebAssembly`
+or `Server`. WebAssembly uses the SPA callback
+`http://localhost:5080/authentication/login-callback`. Interactive Server uses
+the confidential client's OIDC callback `http://localhost:5080/signin-oidc`.
+MAUI redirects are `msal<MAUI_CLIENT_ID>://auth` on Android,
+`msauth.<MAUI_BUNDLE_ID>://auth` on iOS/Mac Catalyst, and
+`ms-appx-web://microsoft.aad.brokerplugin/<MAUI_CLIENT_ID>` on Windows. Match
+native URL schemes to the registered MAUI client and bundle IDs. Use HTTPS
+redirects for deployment.
+
+## Apply migrations and run Web/API
+
+Start PostgreSQL, then run from the repository root:
 
 ```powershell
 dotnet tool restore
@@ -69,18 +110,26 @@ dotnet ef database update `
 dotnet run --project .\src\BlazorMultihostStarter.Web
 ```
 
-The development HTTP profile listens on all interfaces at port `5080`; open
-`http://localhost:5080` on the development machine. The browser client and API
-share the Web origin. The API requires a valid Entra bearer token and rejects
-anonymous requests. Production configuration must use the deployment's
-HTTPS authority, API origin, audience, client IDs, and redirect URIs.
-Outside Development, startup also rejects wildcard `AllowedHosts` and the
-sample PostgreSQL password; provide explicit host names and a managed database
-connection string through the deployment environment.
+Open `http://localhost:5080`. The development HTTP profile listens on all
+interfaces so an Android emulator can reach the API. In WebAssembly mode, the
+browser client and API share one origin. Outside Development, startup rejects
+wildcard `AllowedHosts` and the sample PostgreSQL password; provide explicit
+host names and a managed database connection string.
+
+The shared navigation contains three data-mode examples:
+
+- `/` — server-centric Tasks; the API/database are authoritative.
+- `/tasks/local` — client-local Tasks stored in IndexedDB on the current
+  browser/WebView, without server synchronization.
+- `/tasks/offline` — local-first edits with manual sync to the API. Stale
+  versions return `409 Conflict`; choose whether to keep the server or local
+  snapshot. IndexedDB is not a secure vault and should not hold secrets or
+  sensitive records.
 
 ## Run MAUI
 
-Leave PostgreSQL and the Web/API host running. For the Windows MAUI target:
+Keep PostgreSQL and the Web/API host running. In another terminal, run the
+Windows MAUI target:
 
 ```powershell
 dotnet run --project .\src\BlazorMultihostStarter.Maui `
@@ -89,8 +138,8 @@ dotnet run --project .\src\BlazorMultihostStarter.Maui `
 
 `Maui:ApiBaseAddress` defaults to `http://localhost:5080` on Windows Debug and
 `http://10.0.2.2:5080` on Android Debug. Android Debug permits local HTTP; a
-Release build rejects a non-HTTPS API URL and keeps cleartext disabled. Physical
-devices need the development machine's reachable LAN address and firewall
+Release build rejects a non-HTTPS API URL and keeps cleartext disabled.
+Physical devices need a reachable development-machine address and firewall
 access. MAUI sign-in uses MSAL and the platform broker/system browser.
 
 ## Run tests
@@ -102,8 +151,8 @@ dotnet test .\tests\BlazorMultihostStarter.Api.IntegrationTests\BlazorMultihostS
 dotnet test .\tests\BlazorMultihostStarter.Shared.Tests\BlazorMultihostStarter.Shared.Tests.csproj
 ```
 
-API integration tests default to a disposable SQLite in-memory database and
-use a test-only identity scheme; they do not test a live Entra tenant. To
-exercise the real PostgreSQL provider and migrations, set
-`TEST_POSTGRES_CONNECTION` to a disposable database. CI uses a PostgreSQL
-service for this test path.
+API integration tests default to SQLite in-memory and a test-only identity
+scheme. CI also runs the API flow and migrations against PostgreSQL. Tests do
+not contact a live Entra tenant or verify actual OIDC/MSAL redirects. To run
+the PostgreSQL test path locally, set `TEST_POSTGRES_CONNECTION` to a
+disposable database; never point tests at data that must be kept.

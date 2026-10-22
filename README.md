@@ -1,7 +1,7 @@
 # Blazor Multihost Starter
 
-A small .NET starter for a Blazor Web client and a .NET MAUI Blazor Hybrid app
-that share one Razor UI library and call the same API.
+A .NET reference starter and `dotnet new` template for Blazor Web and .NET MAUI
+Blazor Hybrid apps that share one Razor UI library.
 
 **Status:** learning/reference starter, not production-ready software.
 
@@ -12,30 +12,71 @@ that share one Razor UI library and call the same API.
   - list tasks;
   - create a task;
   - complete a task.
+  - synchronize local snapshots with version-based conflict detection.
+- Three separate data-mode examples:
+  - server-centric API and PostgreSQL at `/`;
+  - client-local IndexedDB at `/tasks/local`;
+  - offline-first local queue with explicit synchronization at `/tasks/offline`.
+- Web interactivity selectable between Interactive WebAssembly and Interactive
+  Server with `Web:Interactivity`.
 - Owner-scoped list pagination (25 items by default, at most 100) and a
   per-user API rate limit (60 requests per minute, in-memory per API process).
-- A single Razor Class Library (RCL) used by both WebAssembly and MAUI.
-- PostgreSQL through EF Core. The Web host serves the Web client and the API;
-  MAUI calls that same API.
-- Microsoft Entra ID/MSAL sign-in for Web and MAUI clients; the API validates
-  delegated access tokens and scopes task access to the signed-in tenant/user.
+- A single Razor Class Library (RCL) used by WebAssembly, Interactive Server,
+  and MAUI.
+- PostgreSQL through EF Core. WebAssembly and MAUI use the protected API;
+  Interactive Server calls the same Application use cases inside the Web host.
+- Microsoft Entra ID authentication: MSAL public clients for WebAssembly and
+  MAUI, and an OIDC cookie session for Interactive Server.
 - Domain, application, infrastructure, API contracts, and client code have
   explicit dependency boundaries.
-- Unit, API integration, and shared-component tests.
+- An installable template that replaces project names and accepts app title,
+  MAUI bundle ID, and public Entra application IDs.
+- Unit, API integration, and shared-component tests, including versioned
+  offline synchronization conflicts.
 
-The Web interactivity decision is recorded in
-[ADR-0001](./docs/adr/0001-web-interactivity.md). The implementation uses
-Interactive WebAssembly because the browser and MAUI app are both API clients.
-The shared screen appears after the WebAssembly client starts; the server does
-not prerender the Tasks page.
-Authentication and client/server execution boundaries are described in
-[ADR-0002](./docs/adr/0002-authentication-and-execution-modes.md). Tasks are
-server-centric: neither client is trusted to enforce access or data ownership.
-Local-first write queues and offline synchronization are not implemented.
+Web interactivity and data authority are independent choices. The default Web
+mode is Interactive WebAssembly; set `Web:Interactivity` to `Server` to use the
+cookie-authenticated Interactive Server host. See
+[ADR-0001](./docs/adr/0001-web-interactivity.md). The three task data modes and
+offline conflict policy are described in
+[ADR-0002](./docs/adr/0002-authentication-and-execution-modes.md) and
+[ADR-0003](./docs/adr/0003-data-modes-and-offline-conflicts.md).
 
-This is a learning/reference starter, not a production-ready identity solution.
-Production use requires your own Entra app registrations, verified redirect
-URIs, HTTPS deployment, and platform-specific sign-in smoke tests.
+This is a learning/reference starter, not production-ready software. It is
+opinionated around Microsoft Entra ID and PostgreSQL; other identity providers
+and databases are not included. Production use requires your own Entra app
+registrations, verified redirect URIs, HTTPS deployment, and real
+platform-specific sign-in and synchronization smoke tests.
+
+## Use it as a project template
+
+Install the template from the repository root:
+
+```powershell
+dotnet new install .
+```
+
+Then generate a renamed project:
+
+```powershell
+dotnet new blazor-multihost-starter `
+  --name ContosoTasks `
+  --appTitle "Contoso Tasks" `
+  --mauiBundleId com.contoso.tasks `
+  --tenantId <tenant-guid> `
+  --apiClientId <api-client-guid> `
+  --webClientId <web-client-guid> `
+  --mauiClientId <maui-client-guid> `
+  --serverClientId <server-client-guid>
+```
+
+Entra IDs may be omitted during generation; unresolved placeholders make the
+application fail closed until configured. The template generates fresh MAUI
+application and User Secrets GUIDs. `ServerClientSecret` is deliberately not a
+template option: set it in User Secrets or deployment secret storage. All
+three data-mode examples are included; choose by route and remove examples the
+application does not need. The Web rendering mode is selected separately with
+`Web:Interactivity` (`WebAssembly` or `Server`).
 
 ## Prerequisites
 
@@ -56,11 +97,13 @@ dotnet tool restore
 
 ### Configure Microsoft Entra ID first
 
-Register three Entra applications: an API that exposes the delegated
-`Tasks.ReadWrite` scope, a single-page Web client, and a native MAUI public
-client. Grant both clients the API's delegated scope. Use the API application's
-client ID as the API audience. The clients are public applications: do not
-create or ship a client secret.
+Register an Entra API application that exposes the delegated `Tasks.ReadWrite`
+scope, a single-page WebAssembly client, and a native MAUI public client. Grant
+both public clients the API's delegated scope. Use the API application's
+client ID as the API audience. Public clients must not have a client secret.
+If you select Interactive Server, also register a confidential Web client with
+the OIDC callback `http://localhost:5080/signin-oidc`. Store its client secret
+in User Secrets; never place it in appsettings or source control.
 
 Set the server-side API values with User Secrets:
 
@@ -70,6 +113,13 @@ dotnet user-secrets set 'Authentication:Entra:TenantId' '<tenant-guid>' --projec
 dotnet user-secrets set 'Authentication:Entra:ApiClientId' '<api-client-guid>' --project $webProject
 dotnet user-secrets set 'Authentication:Entra:WebClientId' '<web-client-guid>' --project $webProject
 dotnet user-secrets set 'Authentication:Entra:MauiClientId' '<maui-client-guid>' --project $webProject
+```
+
+For Interactive Server, also set:
+
+```powershell
+dotnet user-secrets set 'Authentication:Entra:ServerClientId' '<server-client-guid>' --project $webProject
+dotnet user-secrets set 'Authentication:Entra:ServerClientSecret' '<server-client-secret>' --project $webProject
 ```
 
 Set the **public** Web client values in
@@ -86,19 +136,20 @@ Set the **public** Web client values in
 }
 ```
 
-Set the same tenant/API values and the MAUI client ID in
-`src/BlazorMultihostStarter.Maui/Resources/Raw/appsettings.json`. Also replace
-`MauiEntraRegistration.ClientId` in
-`src/BlazorMultihostStarter.Maui/Authentication/MauiEntraOptions.cs` with the
-MAUI app's client ID. Register the MAUI Android redirect
+Set the tenant/API/MAUI client IDs in
+`src/BlazorMultihostStarter.Maui/Resources/Raw/appsettings.json`. The MAUI
+client ID must match `MauiEntraRegistration.ClientId` in
+`src/BlazorMultihostStarter.Maui/Authentication/MauiEntraOptions.cs`. Register
+the WebAssembly redirect `http://localhost:5080/authentication/login-callback`
+and the MAUI Android redirect
 `msal<MAUI_CLIENT_ID>://auth`, the iOS redirect
 `msauth.com.example.blazormultihoststarter://auth` (also used by Mac Catalyst),
 and the Windows broker redirect
 `ms-appx-web://microsoft.aad.brokerplugin/<MAUI_CLIENT_ID>` for that public
 client. Match the Android intent filter and iOS/Mac Catalyst URL schemes in
-the platform files to the registered client ID and bundle ID. Register the Web redirect
-`http://localhost:5080/authentication/login-callback` for local development
-and HTTPS redirects for deployment.
+the platform files to the registered client ID and bundle ID. For Interactive
+Server, register `http://localhost:5080/signin-oidc`. Use HTTPS redirects for
+deployment.
 
 Tenant and client IDs are public identifiers, not secrets. The app never
 accepts anonymous Tasks API requests if Entra configuration is missing or
@@ -123,11 +174,17 @@ dotnet run --project .\src\BlazorMultihostStarter.Web
 Open `http://localhost:5080`. The development HTTP profile listens on all
 interfaces so an Android emulator can reach the API. The project PostgreSQL
 container is exposed on host port `5433` so it can coexist with a local
-PostgreSQL server on `5432`; use the browser-facing
-`localhost` URL on the development machine. The WebAssembly client and `/api/tasks`
-are served by the same Web host, so local Web development doesn't require
-separate CORS configuration. In Development, the OpenAPI document is available
-at `/openapi/v1.json`.
+PostgreSQL server on `5432`. The default WebAssembly client and `/api/tasks`
+are served from one origin. To use Interactive Server, set
+`Web:Interactivity` to `Server` in Web settings and configure the confidential
+server client values above. In Development, OpenAPI is available at
+`/openapi/v1.json`.
+
+The shared navigation exposes the server-centric, client-local, and offline
+hybrid Tasks examples. IndexedDB data is scoped to the browser/WebView and is
+not a secure vault. Offline synchronization requires sign-in; a stale
+`BaseVersion` returns `409 Conflict` and the UI asks whether to keep the server
+or local snapshot.
 
 ## Run the MAUI app
 
@@ -139,9 +196,10 @@ dotnet run --project .\src\BlazorMultihostStarter.Maui `
   --framework net10.0-windows10.0.19041.0
 ```
 
-The shared Tasks screen uses the same API client in Web and MAUI. A Debug
+The server-centric and offline-hybrid examples use the API from MAUI. A Debug
 build defaults to `http://localhost:5080` on Windows and
-`http://10.0.2.2:5080` on the Android emulator. For a physical device, set
+`http://10.0.2.2:5080` on the Android emulator. The client-local example uses
+the WebView's IndexedDB and does not contact the API. For a physical device, set
 `Maui:ApiBaseAddress` to an address reachable from it; `localhost` on a device
 is the device itself. Release builds require an HTTPS API address. See
 [local setup](./docs/GETTING_STARTED.md) for platform-specific guidance.
@@ -169,19 +227,23 @@ Docker. Set `TEST_POSTGRES_CONNECTION` to a disposable PostgreSQL connection
 string to run the same API flow against PostgreSQL and apply the real migration.
 Never point integration tests at a database containing data you need to keep.
 Tests use a test-only authentication handler; they verify API authorization
-policies and owner isolation but do not contact a live Entra tenant or prove
-the real MSAL redirect/broker flow.
+policies, owner isolation, local queue behavior, and version conflicts but do
+not contact a live Entra tenant or prove real OIDC/MSAL redirects or native
+broker flows.
 
 ## Architecture and adding features
 
 - [Architecture](./docs/ARCHITECTURE.md) — projects, responsibilities, and dependency direction.
 - [Adding a feature](./docs/ADDING_FEATURES.md) — the Tasks VSA golden path and test checklist.
 - [Getting started](./docs/GETTING_STARTED.md) — local database, API URL, and MAUI targets.
-- [Roadmap](./ROADMAP.md) — V1 scope and deliberate follow-up work.
+- [Roadmap](./ROADMAP.md) — current status, verification boundaries, and follow-up work.
+- [ADR-0003](./docs/adr/0003-data-modes-and-offline-conflicts.md) — client-local and offline sync semantics.
 
 This starter borrows architectural practices from
 [dotnet-react-starter](https://github.com/Karol-Malecki-dev/dotnet-react-starter);
 it intentionally does not copy that application's password/refresh-token
 session model, business features, deployment stack, or operational tooling.
-It uses Entra/MSAL public-client flows because WebAssembly and MAUI have
-different token-acquisition and platform-storage requirements.
+It uses Entra/MSAL public-client flows for WebAssembly and MAUI because those
+hosts have different token-acquisition and platform-storage requirements.
+Interactive Server uses a separate OIDC cookie session and a server-side
+adapter; it requires a confidential Entra client and secret.

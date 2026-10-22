@@ -1,79 +1,74 @@
-# ADR-0001: Blazor Web interactivity
+# ADR-0001: Web interactivity
 
-- **Status:** accepted for V1
-- **Date:** 2026-10-20
-- **Decision:** Interactive WebAssembly
+- **Status:** accepted; Interactive WebAssembly is the default, Interactive Server is an opt-in host mode
+- **Date:** 2026-10-20; updated 2026-10-22
+- **Scope:** Web rendering and its host-specific authentication/client wiring
 
 ## Context
 
-The starter has two UI hosts: a browser client and a .NET MAUI Blazor Hybrid
-client. Both must reuse the same Razor Class Library (RCL), and both call the
-same HTTP API. The Web host serves the WebAssembly client and API from one
-origin for local development and the initial deployment shape.
-
-The official `maui-blazor-web` template generates a shared RCL for both
-interactive modes. Its WebAssembly variant has a Web server project and a
-separate `.Web.Client` project; its Server variant runs interactive components
-on the server and does not need that client project. Template generation
-confirmed those project shapes. This was a structural comparison, not a
-performance benchmark.
+The solution has a browser client, a .NET MAUI Blazor Hybrid client, one shared
+Razor Class Library, and a protected Tasks API. Web and MAUI share components,
+but their runtime and authentication boundaries differ. Web rendering mode
+must not be confused with where task data is authoritative.
 
 ## Options
 
 ### Interactive Server
 
-- The browser sends UI events over a persistent SignalR connection; component
-  code runs on the server.
-- It avoids downloading the .NET client runtime and application assemblies.
-- It requires live server circuits and a reachable server connection for
-  interactivity.
-- The browser UI is a server-rendered client, while MAUI runs components
-  locally in its WebView. That gives the two hosts different runtime
-  boundaries.
+- Browser UI events execute on the ASP.NET Core server over a persistent
+  SignalR circuit.
+- It avoids downloading the WebAssembly runtime and client assemblies.
+- Interactivity requires a live connection and server circuit.
+- The Web host uses an Entra OIDC confidential client and cookie session.
+  Server-side UI calls Application handlers directly under the validated
+  principal; MAUI continues to call the bearer-protected API.
 
 ### Interactive WebAssembly
 
-- Interactive components and their event handlers run in the browser.
-- The browser and MAUI clients both call the same HTTP API, matching the
-  intended host boundary.
-- It downloads the WebAssembly runtime and client assemblies before
-  interactivity, so initial download size is larger.
-- WebAssembly cannot access server-only services. API calls, CORS, and
-  same-origin hosting must be configured intentionally.
-- Co-hosting the Web client and API avoids CORS for the initial Web deployment.
+- UI events execute in the browser after the runtime and client assemblies load.
+- The browser and MAUI are both API clients, which keeps their data access
+  boundary similar.
+- The WebAssembly public client uses MSAL Authorization Code + PKCE and calls
+  the same-origin API with a delegated access token.
+- The initial payload is larger than Interactive Server. Co-hosting Web assets
+  and the API avoids CORS in the default deployment shape.
 
 ## Decision
 
-Use **Interactive WebAssembly** for the Web host in V1. Keep reusable UI in the
-RCL, and keep API access behind a client-side service that can be registered by
-both the WebAssembly and MAUI hosts. The Web host may serve both static Web
-assets and API endpoints, but the browser client must not reference server
-Infrastructure or the database.
+Support both Interactive WebAssembly and Interactive Server in the Web host.
+`Web:Interactivity` selects the mode; WebAssembly is the default. Keep common
+UI in the RCL. Keep authentication and `ITasksClient` registrations in each
+host's composition root.
+
+The mode is selected per Web host deployment, not per component. MAUI always
+uses Blazor Hybrid. Data authority remains a separate per-feature decision.
 
 ## Consequences
 
-- The solution contains a Web server project and a Web client project in
-  addition to the MAUI and shared UI projects.
-- Web and MAUI use the same API client abstraction and public contracts; each
-  host configures its own `HttpClient` base address.
-- The Web host serves API and Web assets from one origin in the default setup.
-  A separately hosted API would require explicit CORS and deployment
-  configuration.
-- WebAssembly prerendering is disabled for the shared UI. The server doesn't
-  register a server-side `ITasksApiClient`; data fetching starts after the
-  WebAssembly client boots, so the Web host doesn't make an HTTP request back
-  into itself while rendering the initial page. The first interactive content
-  appears after the WebAssembly bundle loads.
-- This choice is not a claim that WebAssembly is faster or smaller. If the
-  starter later needs server-side rendering, reduced initial download, or
-  another deployment topology, record and test that change in a new ADR.
-- Interactive Auto and mixed per-component render modes remain out of V1.
+- The Web host registers and maps both interactive render modes.
+- In WebAssembly mode, the Web.Client assembly uses MSAL and the protected
+  HTTP API.
+- In Server mode, the Web host uses OIDC/cookie authentication and an
+  application-layer adapter; it does not send a browser token to its own API.
+- Server mode requires a confidential Entra client and a secret supplied
+  through User Secrets or deployment secret storage. WebAssembly and MAUI are
+  public clients and must not contain a client secret.
+- Both modes share RCL components. They do not have identical request paths,
+  so host-specific differences belong in DI adapters rather than Razor
+  `#if` branches.
+- Interactive Auto and mixed per-component render modes are outside this
+  starter's scope.
 
-## Validation
+## Verification boundary
 
-- The official template generated both Server and WebAssembly variants with a
-  shared RCL.
-- The WebAssembly template produced a distinct `.Web.Client` project; the
-  Server variant did not.
-- No latency or bundle-size measurements were collected. The choice is based
-  on the two-client/API requirement, not a benchmark.
+- CI and integration tests verify that the Web host can serve each configured
+  render-mode shell and that the API policies work with a test identity.
+- The real Entra confidential-client sign-in, SPA redirect, MAUI broker flow,
+  and sign-out behavior are not verified by these tests.
+- No performance or bundle-size benchmark was collected. The default is chosen
+  for the browser-plus-MAUI API-client model, not from a benchmark.
+
+## References
+
+- [Microsoft Learn: Blazor render modes](https://learn.microsoft.com/en-us/aspnet/core/blazor/components/render-modes?view=aspnetcore-10.0)
+- [Microsoft Learn: Blazor WebAssembly OIDC authentication](https://learn.microsoft.com/en-us/aspnet/core/blazor/security/webassembly/standalone-with-authentication-library?view=aspnetcore-10.0)
