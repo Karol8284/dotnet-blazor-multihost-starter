@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>4ce72915-6be7-46e3-9877-8af2254a8f52</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,6 +13,7 @@
     <ProjectReference Include="..\BlazorMultihostStarter.Application\BlazorMultihostStarter.Application.csproj" />
     <ProjectReference Include="..\BlazorMultihostStarter.Contracts\BlazorMultihostStarter.Contracts.csproj" />
     <ProjectReference Include="..\BlazorMultihostStarter.Infrastructure\BlazorMultihostStarter.Infrastructure.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

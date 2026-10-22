@@ -11,6 +11,9 @@ public sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
         builder.ToTable("Tasks");
 
         builder.HasKey(task => task.Id);
+        builder.Property(task => task.OwnerId)
+            .HasMaxLength(80)
+            .IsRequired();
         builder.Property(task => task.Title)
             .HasMaxLength(120)
             .IsRequired();
@@ -18,6 +21,6 @@ public sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
         builder.Property(task => task.IsCompleted).IsRequired();
         builder.Property(task => task.CompletedAtUtc);
 
-        builder.HasIndex(task => task.CreatedAtUtc);
+        builder.HasIndex(task => new { task.OwnerId, task.CreatedAtUtc });
     }
 }

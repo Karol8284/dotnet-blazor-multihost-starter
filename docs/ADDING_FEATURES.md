@@ -17,6 +17,8 @@ For a new operation:
 4. Add a public request/response contract only if the HTTP API needs it.
 5. Add an endpoint in the Tasks API module. Validate external input and map
    expected validation and not-found results to explicit HTTP responses.
+   Require the Tasks authorization policy and derive owner identity only from
+   validated claims; never accept an owner ID from a client request.
 6. Add the operation to `ITasksApiClient` and its implementation if a UI host
    needs it.
 7. Add or update the feature UI in
@@ -28,8 +30,14 @@ For a new operation:
 - Domain: the invariant and its invalid boundary cases.
 - Application: success, not-found/validation outcomes, and correct port calls.
 - API integration: status code, response contract, persistence, and invalid
-  input. Run against PostgreSQL in CI or with `TEST_POSTGRES_CONNECTION`; the
-  local default is SQLite in-memory.
+  input, anonymous rejection, and cross-user access denial. Run against
+  PostgreSQL in CI or with `TEST_POSTGRES_CONNECTION`; the local default is
+  SQLite in-memory with test-only identities.
+- Collection endpoints must define a maximum page size and an ownership-aware
+  query. Do not return an unbounded set of a user's rows.
+- Client requests obtain a delegated access token through the host's
+  `IUserAuthenticationSession`; never pass bearer tokens through Razor
+  component parameters, URLs, or logs.
 - Shared UI: loading, empty, success, validation, and API-failure states when
   the component changes.
 - Build the Web host and a supported MAUI target after changing shared code.

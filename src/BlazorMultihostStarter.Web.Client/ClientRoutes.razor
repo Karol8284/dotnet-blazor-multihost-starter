@@ -1,0 +1,17 @@
+<Router AppAssembly="typeof(ClientRoutes).Assembly" AdditionalAssemblies="SharedAssemblies">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(BlazorMultihostStarter.Shared.Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Not found</PageTitle>
+        <h1>Page not found</h1>
+    </NotFound>
+</Router>
+
+@code {
+    private static readonly System.Reflection.Assembly[] SharedAssemblies =
+    [
+        typeof(BlazorMultihostStarter.Shared._Imports).Assembly
+    ];
+}

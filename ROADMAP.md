@@ -1,8 +1,10 @@
 # Roadmap: dotnet-blazor-multihost-starter
 
-**Status:** implementacja V1 gotowa do review na branchu
-`feature/v1-blazor-multihost`; CI przeszedł, pełny runtime smoke test obu hostów
-pozostaje do wykonania.
+**Status:** V1 jest na `main`; security hardening V2 jest w toku na branchu
+`feature/oidc-secure-tasks`. API auth, owner isolation, pagination, rate
+limiting i host-specific MSAL sign-in code są zaimplementowane. Automatyczne
+testy przechodzą z testowymi identities; realny Entra sign-in i runtime smoke
+test obu hostów wymagają app registrations.
 **Data punktu odniesienia:** 2026-10-20
 
 ## Aktualny dowód realizacji V1
@@ -24,6 +26,46 @@ pozostaje do wykonania.
 - Pełny runtime smoke test w przeglądarce i w uruchomionej aplikacji MAUI nie
   został wykonany. Kompilacja obu hostów i API/component tests nie zastępują
   takiego sprawdzenia.
+
+## V2 — security baseline dla wieloplatformowego Tasks
+
+**Cel:** zastąpić anonimowy, współdzielony demo CRUD jednym chronionym,
+serwerowo-autorytatywnym przepływem używanym przez WebAssembly i MAUI.
+
+### Przyjęte granice
+
+- Tryb renderowania (WebAssembly/Server/MAUI Hybrid) jest niezależny od tego,
+  gdzie leży źródło prawdy dla danych.
+- `Tasks` używa trybu server-centric: API egzekwuje token, scope i własność
+  wiersza. UI nie przesyła ani nie wybiera owner ID.
+- Wzorzec to Microsoft Entra ID + MSAL, Authorization Code + PKCE dla
+  publicznych klientów, osobne client IDs dla Web i MAUI, bez client secrets
+  w kodzie lub bundle.
+- Local-first preferences/drafts i hybrid offline write/sync są opisane, ale
+  nie są częścią bezpiecznego Tasks slice'a. Synchronizacja konfliktów wymaga
+  osobnego ADR i testów.
+- Starsze anonimowe Tasks są przypisane do zarezerwowanego owner sentinel w
+  migracji i nie są widoczne dla żadnego Entra usera.
+
+Szczegóły decyzji i ograniczeń platformowych opisuje
+[ADR-0002](./docs/adr/0002-authentication-and-execution-modes.md).
+
+### Definition of Done V2
+
+- API fail-closed w Development/Production, waliduje Entra tenant, issuer,
+  audience, podpis/ważność tokenu, dozwolony `azp` i delegated scope.
+- List/Get/Create/Complete są wymagane auth i zawsze filtrują po zweryfikowanym
+  `tid` + `oid`; request body nie może nadpisać właściciela.
+- Testy obejmują anonymous `401`, brak scope/nieznanego clienta `403`,
+  izolację A/B, odrzucone odczyty i mutacje cudzych danych.
+- Web i MAUI pobierają delegated API access token przez własne host adapters;
+  żaden secret ani token nie trafia do shared UI ani logów.
+- Release MAUI wymaga HTTPS; Web redirect i native redirect URIs są
+  konfigurowalne i udokumentowane.
+- Build/test CI przechodzi; runtime login/Web↔MAUI smoke test jest wykonany
+  przy skonfigurowanym Entra tenant.
+- Dokumentacja odróżnia gotowe server-centric flow od niewdrożonych
+  client-local i offline-hybrid przykładów.
 
 ## Cel
 
@@ -249,9 +291,10 @@ zakresu bezpieczeństwa, wdrożenia i operacji.
 
 Rozważać dopiero po użyciu pierwszego przepływu:
 
-- uwierzytelnianie i autoryzacja API;
 - natywne funkcje urządzeń (np. storage, kamera, powiadomienia);
 - offline i synchronizacja;
+- rate limiting/paginacja dla większych zbiorów, jeśli będzie to wymagane przez
+  charakter docelowej aplikacji;
 - kolejne moduły biznesowe, worker/outbox lub pliki;
 - pełne E2E dla urządzeń, deployment, telemetry i observability;
 - template/source generator, jeśli powstaną co najmniej dwa rzeczywiste

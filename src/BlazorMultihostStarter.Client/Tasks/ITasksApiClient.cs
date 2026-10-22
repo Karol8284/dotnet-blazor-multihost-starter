@@ -4,7 +4,10 @@ namespace BlazorMultihostStarter.Client.Tasks;
 
 public interface ITasksApiClient
 {
-    Task<IReadOnlyList<TaskResponse>> ListAsync(CancellationToken cancellationToken = default);
+    Task<TaskListResponse> ListAsync(
+        int page = 1,
+        int pageSize = 25,
+        CancellationToken cancellationToken = default);
 
     Task<TaskResponse> CreateAsync(string? title, CancellationToken cancellationToken = default);
 

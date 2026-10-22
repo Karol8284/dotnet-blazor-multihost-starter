@@ -37,6 +37,11 @@ namespace BlazorMultihostStarter.Infrastructure.Data.Migrations
                     b.Property<bool>("IsCompleted")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("OwnerId")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -44,7 +49,7 @@ namespace BlazorMultihostStarter.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedAtUtc");
+                    b.HasIndex("OwnerId", "CreatedAtUtc");
 
                     b.ToTable("Tasks", (string)null);
                 });

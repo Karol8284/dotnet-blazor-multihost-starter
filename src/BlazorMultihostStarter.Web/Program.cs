@@ -1,18 +1,47 @@
 using BlazorMultihostStarter.Web.Components;
 using BlazorMultihostStarter.Application;
 using BlazorMultihostStarter.Infrastructure;
+using BlazorMultihostStarter.Web.Security;
 using BlazorMultihostStarter.Web.Modules.Tasks;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 builder.Services.AddOpenApi();
+builder.Services.AddEntraApiAuthentication(builder.Configuration);
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("tasks-api", context =>
+    {
+        var partitionKey = EntraTaskOwner.TryGetOwnerId(context.User, out var ownerId)
+            ? ownerId
+            : context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 60,
+                QueueLimit = 0,
+                Window = TimeSpan.FromMinutes(1)
+            });
+    });
+});
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException(
         "Configure the ConnectionStrings:DefaultConnection setting before starting the Web host.");
 var databaseProvider = builder.Configuration["Database:Provider"] ?? "PostgreSQL";
+
+if (!builder.Environment.IsDevelopment())
+{
+    ProductionConfiguration.Validate(builder.Configuration, connectionString);
+}
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(connectionString, databaseProvider);
@@ -36,6 +65,9 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
+app.UseAuthentication();
+app.UseRateLimiter();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();

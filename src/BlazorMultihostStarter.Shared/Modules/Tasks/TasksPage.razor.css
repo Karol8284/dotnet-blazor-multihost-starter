@@ -40,6 +40,11 @@ h2 {
     line-height: 1.6;
 }
 
+.sign-out-button {
+    margin-top: 0.75rem;
+    padding-left: 0;
+}
+
 .task-form,
 .task-list-panel {
     padding: 1.25rem;
@@ -171,6 +176,10 @@ h2 {
     padding: 1.5rem 0 0.5rem;
     color: var(--muted);
     line-height: 1.5;
+}
+
+.sign-in-panel .empty-state {
+    padding-top: 0.75rem;
 }
 
 .error-panel {

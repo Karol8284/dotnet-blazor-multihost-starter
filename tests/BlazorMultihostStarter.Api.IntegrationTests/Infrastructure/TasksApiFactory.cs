@@ -2,10 +2,14 @@ using BlazorMultihostStarter.Infrastructure.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
+using BlazorMultihostStarter.Web.Security;
 using Microsoft.Data.Sqlite;
 
 namespace BlazorMultihostStarter.Api.IntegrationTests.Infrastructure;
@@ -23,8 +27,28 @@ public sealed class TasksApiFactory : WebApplicationFactory<Program>
             : "Data Source=:memory:";
 
         builder.UseEnvironment("Development");
+        builder.ConfigureAppConfiguration((_, configuration) =>
+        {
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Authentication:Entra:TenantId"] = TestAuthenticationHandler.TenantId,
+                ["Authentication:Entra:ApiClientId"] = TestAuthenticationHandler.ApiClientId,
+                ["Authentication:Entra:WebClientId"] = TestAuthenticationHandler.WebClientId,
+                ["Authentication:Entra:MauiClientId"] = TestAuthenticationHandler.MauiClientId,
+                ["Authentication:Entra:ApiScopeName"] = "Tasks.ReadWrite"
+            });
+        });
         builder.ConfigureTestServices(services =>
         {
+            services.Configure<EntraApiOptions>(options =>
+            {
+                options.TenantId = TestAuthenticationHandler.TenantId;
+                options.ApiClientId = TestAuthenticationHandler.ApiClientId;
+                options.WebClientId = TestAuthenticationHandler.WebClientId;
+                options.MauiClientId = TestAuthenticationHandler.MauiClientId;
+                options.ApiScopeName = "Tasks.ReadWrite";
+            });
+
             services.RemoveAll<StarterDbContext>();
             services.RemoveAll<DbContextOptions<StarterDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<StarterDbContext>>();
@@ -39,6 +63,15 @@ public sealed class TasksApiFactory : WebApplicationFactory<Program>
                     options.UseSqlite(_sqliteConnection);
                 }
             });
+
+            services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = TestAuthenticationHandler.SchemeName;
+                options.DefaultChallengeScheme = TestAuthenticationHandler.SchemeName;
+            })
+            .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
+                TestAuthenticationHandler.SchemeName,
+                _ => { });
         });
     }
 

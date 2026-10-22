@@ -2,12 +2,15 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageVersion Include="bunit" Version="2.12.5" />
+    <PackageVersion Include="Microsoft.Authentication.WebAssembly.Msal" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.13" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="10.0.13" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.13" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.13" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.13" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.13" />
@@ -18,6 +21,9 @@
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
     <PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.110" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.110" />
+    <PackageVersion Include="Microsoft.Identity.Client" Version="4.91.1" />
+    <PackageVersion Include="Microsoft.Identity.Client.Desktop" Version="4.91.1" />
+    <PackageVersion Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.91.1" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />

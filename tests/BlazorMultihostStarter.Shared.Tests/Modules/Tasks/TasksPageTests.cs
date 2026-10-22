@@ -1,4 +1,5 @@
 using System.Net;
+using BlazorMultihostStarter.Client.Authentication;
 using BlazorMultihostStarter.Client.Tasks;
 using BlazorMultihostStarter.Contracts.Tasks;
 using BlazorMultihostStarter.Shared.Modules.Tasks;
@@ -14,6 +15,7 @@ public sealed class TasksPageTests
     {
         using var context = new BunitContext();
         context.Services.AddSingleton<ITasksApiClient>(new FakeTasksApiClient());
+        context.Services.AddSingleton<IUserAuthenticationSession>(new FakeAuthenticationSession());
 
         var cut = context.Render<TasksPage>();
 
@@ -27,6 +29,7 @@ public sealed class TasksPageTests
     {
         using var context = new BunitContext();
         context.Services.AddSingleton<ITasksApiClient>(new FakeTasksApiClient(failRequests: true));
+        context.Services.AddSingleton<IUserAuthenticationSession>(new FakeAuthenticationSession());
 
         var cut = context.Render<TasksPage>();
 
@@ -40,6 +43,7 @@ public sealed class TasksPageTests
         using var context = new BunitContext();
         context.Services.AddSingleton<ITasksApiClient>(
             new FakeTasksApiClient(failureStatus: HttpStatusCode.InternalServerError));
+        context.Services.AddSingleton<IUserAuthenticationSession>(new FakeAuthenticationSession());
 
         var cut = context.Render<TasksPage>();
 
@@ -48,11 +52,25 @@ public sealed class TasksPageTests
     }
 
     [Fact]
+    public void Explains_rate_limit_responses()
+    {
+        using var context = new BunitContext();
+        context.Services.AddSingleton<ITasksApiClient>(
+            new FakeTasksApiClient(failureStatus: HttpStatusCode.TooManyRequests));
+        context.Services.AddSingleton<IUserAuthenticationSession>(new FakeAuthenticationSession());
+
+        var cut = context.Render<TasksPage>();
+
+        cut.WaitForAssertion(() => Assert.Contains("Too many requests", cut.Markup));
+    }
+
+    [Fact]
     public void Creates_task_through_shared_api_client()
     {
         using var context = new BunitContext();
         var apiClient = new FakeTasksApiClient();
         context.Services.AddSingleton<ITasksApiClient>(apiClient);
+        context.Services.AddSingleton<IUserAuthenticationSession>(new FakeAuthenticationSession());
 
         var cut = context.Render<TasksPage>();
         cut.Find("#new-task-title").Input("Share this task");
@@ -61,6 +79,54 @@ public sealed class TasksPageTests
         cut.WaitForAssertion(() => Assert.Contains("Share this task", cut.Markup));
         Assert.Single(apiClient.Tasks);
         Assert.Equal("Share this task", apiClient.Tasks[0].Title);
+    }
+
+    [Fact]
+    public void Requires_sign_in_before_loading_tasks()
+    {
+        using var context = new BunitContext();
+        var apiClient = new FakeTasksApiClient();
+        var authentication = new FakeAuthenticationSession(isSignedIn: false);
+        context.Services.AddSingleton<ITasksApiClient>(apiClient);
+        context.Services.AddSingleton<IUserAuthenticationSession>(authentication);
+
+        var cut = context.Render<TasksPage>();
+
+        cut.WaitForAssertion(() => Assert.Contains("Sign in required", cut.Markup));
+        Assert.Equal(0, apiClient.ListRequestCount);
+
+        cut.Find(".sign-in-panel button").Click();
+
+        cut.WaitForAssertion(() => Assert.Contains("No tasks yet", cut.Markup));
+        Assert.True(authentication.IsSignedIn);
+        Assert.Equal(1, apiClient.ListRequestCount);
+    }
+
+    [Fact]
+    public void Loads_more_tasks_using_a_later_page()
+    {
+        using var context = new BunitContext();
+        var apiClient = new FakeTasksApiClient();
+        for (var index = 0; index < 30; index++)
+        {
+            apiClient.Tasks.Add(new TaskResponse(
+                Guid.NewGuid(),
+                $"Task {index + 1}",
+                false,
+                DateTimeOffset.UtcNow.AddMinutes(-index),
+                null));
+        }
+
+        context.Services.AddSingleton<ITasksApiClient>(apiClient);
+        context.Services.AddSingleton<IUserAuthenticationSession>(new FakeAuthenticationSession());
+
+        var cut = context.Render<TasksPage>();
+
+        cut.WaitForAssertion(() => Assert.Contains("Task 25", cut.Markup));
+        Assert.DoesNotContain("Task 26", cut.Markup);
+        cut.Find(".load-more-button").Click();
+        cut.WaitForAssertion(() => Assert.Contains("Task 26", cut.Markup));
+        Assert.Contains("Task 30", cut.Markup);
     }
 
     [Fact]
@@ -81,8 +147,15 @@ public sealed class TasksPageTests
     {
         public List<TaskResponse> Tasks { get; } = [];
 
-        public Task<IReadOnlyList<TaskResponse>> ListAsync(CancellationToken cancellationToken = default)
+        public int ListRequestCount { get; private set; }
+
+        public Task<TaskListResponse> ListAsync(
+            int page = 1,
+            int pageSize = 25,
+            CancellationToken cancellationToken = default)
         {
+            ListRequestCount++;
+
             if (failureStatus is { } statusCode)
             {
                 throw new HttpRequestException("API request failed.", null, statusCode);
@@ -93,7 +166,16 @@ public sealed class TasksPageTests
                 throw new HttpRequestException("API unavailable.");
             }
 
-            return Task.FromResult<IReadOnlyList<TaskResponse>>(Tasks.ToArray());
+            var items = Tasks
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToArray();
+
+            return Task.FromResult(new TaskListResponse(
+                items,
+                page,
+                pageSize,
+                Tasks.Count > page * pageSize));
         }
 
         public Task<TaskResponse> CreateAsync(
@@ -126,6 +208,32 @@ public sealed class TasksPageTests
                 CompletedAtUtc = DateTimeOffset.UtcNow
             };
             return Task.FromResult(Tasks[index]);
+        }
+    }
+
+    private sealed class FakeAuthenticationSession(bool isSignedIn = true)
+        : IUserAuthenticationSession
+    {
+        public bool IsSignedIn { get; private set; } = isSignedIn;
+
+        public Task<bool> IsSignedInAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(IsSignedIn);
+
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken = default) =>
+            IsSignedIn
+                ? Task.FromResult("test-access-token")
+                : Task.FromException<string>(new AuthenticationRequiredException());
+
+        public Task SignInAsync(CancellationToken cancellationToken = default)
+        {
+            IsSignedIn = true;
+            return Task.CompletedTask;
+        }
+
+        public Task SignOutAsync(CancellationToken cancellationToken = default)
+        {
+            IsSignedIn = false;
+            return Task.CompletedTask;
         }
     }
 }

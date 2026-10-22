@@ -4,10 +4,17 @@
 
 ```text
 Browser
-  └─ Blazor WebAssembly client ─┐
-                                ├─ HTTP API in the Web host
-MAUI Blazor Hybrid ─────────────┘       └─ Tasks application slices
-                                            └─ PostgreSQL through EF Core
+  └─ Blazor WebAssembly + MSAL ─┐
+                                ├─ Bearer access token ─> Tasks API
+MAUI Blazor Hybrid + MSAL ──────┘                          │
+                                                          v
+                                              Tasks application slices
+                                                          │
+                                                          v
+                                            PostgreSQL through EF Core
+
+                         Microsoft Entra ID
+                       (OIDC, separate clients)
 
 Browser UI and MAUI UI both use BlazorMultihostStarter.Shared (RCL).
 ```
@@ -24,11 +31,11 @@ PostgreSQL or Infrastructure directly.
 | `BlazorMultihostStarter.Application` | Tasks use cases, application results, and persistence ports, grouped by vertical slice. |
 | `BlazorMultihostStarter.Contracts` | Stable HTTP request and response DTOs shared by API and clients. |
 | `BlazorMultihostStarter.Infrastructure` | EF Core DbContext, PostgreSQL mapping, migrations, and repository adapters. |
-| `BlazorMultihostStarter.Client` | Typed HTTP API client shared by WebAssembly and MAUI. |
+| `BlazorMultihostStarter.Client` | Typed bearer-token HTTP API client and host-neutral authentication contract. |
 | `BlazorMultihostStarter.Shared` | Razor Class Library: route, layout, components, and styles shared by both UI hosts. |
-| `BlazorMultihostStarter.Web` | ASP.NET Core host, WebAssembly bootstrapping, API endpoints, and composition root. |
-| `BlazorMultihostStarter.Web.Client` | Browser-side WebAssembly entry point and browser service registration. |
-| `BlazorMultihostStarter.Maui` | Native MAUI shell, BlazorWebView, and device-specific API configuration. |
+| `BlazorMultihostStarter.Web` | ASP.NET Core host, Entra JWT validation, API endpoints, and server composition root. |
+| `BlazorMultihostStarter.Web.Client` | Browser-side MSAL/OIDC flow, token acquisition, and WebAssembly routes. |
+| `BlazorMultihostStarter.Maui` | Native MAUI shell, MSAL public-client flow, platform broker setup, and API configuration. |
 
 ## Dependency direction
 
@@ -63,8 +70,9 @@ More precisely:
   Application/Infrastructure projects.
 
 The client and server may share DTOs, not EF entities. API contracts are not a
-security boundary by themselves; future authentication and authorization must
-be enforced by the API.
+security boundary. The API validates the access token and scope, then derives
+task ownership from validated Entra `tid` and `oid` claims. An owner ID in
+client input is never trusted.
 
 ## Vertical slices and module boundary
 
@@ -96,14 +104,42 @@ empty layers or split projects merely to increase project count.
 ## Data flow
 
 1. A shared Razor component calls `ITasksApiClient`.
-2. The host supplies an `HttpClient`: same-origin for Web, configured API URL
-   for MAUI.
-3. The API endpoint validates the public request and invokes one application
-   use case.
-4. The use case applies domain rules and uses an application-owned repository
-   port.
-5. Infrastructure persists through EF Core and PostgreSQL.
-6. The API returns a public contract DTO; no EF entity crosses the boundary.
+2. The host-specific authentication session obtains a delegated access token
+   through MSAL; the Web client and MAUI client keep separate public-client
+   registrations and redirect configuration.
+3. `TasksApiClient` attaches the access token to the HTTP request. It never
+   sends a client-supplied owner ID.
+4. The Tasks API validates the Entra signature, issuer, audience, allowed
+   client ID, delegated scope, tenant, and user object ID.
+5. The endpoint derives the owner key from `tid` + `oid` and invokes one
+   application use case with that key.
+6. Infrastructure filters every list/read/mutation by owner and persists
+   through EF Core/PostgreSQL.
+7. The API returns a public contract DTO; no EF entity crosses the boundary.
+
+List requests are paginated: the API defaults to 25 items, enforces a maximum
+page size of 100, and applies an in-memory fixed-window rate limit of 60
+requests per minute per authenticated user. The limiter is per process; a
+multi-instance production deployment needs an upstream or distributed limiter.
+
+The Tasks list endpoint uses page-based results with a default page size of 25
+and an enforced maximum of 100. API requests are rate-limited to 60 per minute
+per authenticated tenant/user (or per remote IP before authentication).
+The built-in limiter is in-memory and per process; multi-instance production
+deployments need a distributed limiter or an upstream gateway policy.
 
 Migrations are applied explicitly with `dotnet ef database update`; the Web
 host does not mutate a production database automatically on startup.
+
+## Operation/data modes
+
+Blazor rendering mode and data authority are independent choices. The current
+Web host uses Interactive WebAssembly, while MAUI renders locally in a
+BlazorWebView. The Tasks feature is server-centric in both hosts: PostgreSQL
+and the API remain authoritative and every request is authorized.
+
+Client-local data is appropriate for non-sensitive preferences or disposable
+drafts. A future hybrid/offline feature may cache server data or queue writes,
+but must define sync, replay, conflict, and authorization behavior explicitly.
+V1/V2 does not implement offline synchronization. See
+[ADR-0002](./adr/0002-authentication-and-execution-modes.md).

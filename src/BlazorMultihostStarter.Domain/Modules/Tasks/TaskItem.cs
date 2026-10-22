@@ -8,6 +8,8 @@ public sealed class TaskItem
 
     public Guid Id { get; private set; }
 
+    public string OwnerId { get; private set; } = string.Empty;
+
     public string Title { get; private set; } = string.Empty;
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
@@ -16,8 +18,13 @@ public sealed class TaskItem
 
     public DateTimeOffset? CompletedAtUtc { get; private set; }
 
-    public static TaskItem Create(string? title, DateTimeOffset createdAtUtc)
+    public static TaskItem Create(string? title, string? ownerId, DateTimeOffset createdAtUtc)
     {
+        if (string.IsNullOrWhiteSpace(ownerId) || ownerId.Length > 80)
+        {
+            throw new TaskDomainException(nameof(OwnerId), "A valid task owner is required.");
+        }
+
         if (string.IsNullOrWhiteSpace(title))
         {
             throw new TaskDomainException(nameof(Title), "Enter a task title.");
@@ -32,6 +39,7 @@ public sealed class TaskItem
         return new TaskItem
         {
             Id = Guid.NewGuid(),
+            OwnerId = ownerId.Trim(),
             Title = normalizedTitle,
             CreatedAtUtc = createdAtUtc
         };

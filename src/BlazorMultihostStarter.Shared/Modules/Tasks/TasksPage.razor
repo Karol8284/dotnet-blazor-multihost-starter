@@ -1,6 +1,7 @@
 ﻿@page "/"
 @using System.Net
 @inject ITasksApiClient TasksApiClient
+@inject IUserAuthenticationSession AuthenticationSession
 
 <PageTitle>Tasks | Blazor Multihost Starter</PageTitle>
 
@@ -11,97 +12,228 @@
         <p class="page-description">
             A small end-to-end example: both hosts use the same UI, API, and PostgreSQL database.
         </p>
+        @if (_isAuthenticated)
+        {
+            <button class="text-button sign-out-button" type="button" @onclick="SignOutAsync">
+                Sign out
+            </button>
+        }
     </div>
 
-    <form class="task-form" @onsubmit="CreateTaskAsync" @onsubmit:preventDefault>
-        <label for="new-task-title">Add a task</label>
-        <div class="task-input-row">
-            <input id="new-task-title"
-                   @bind="_newTitle"
-                   @bind:event="oninput"
-                   maxlength="120"
-                   autocomplete="off"
-                   placeholder="What needs to be done?" />
-            <button class="primary-button" type="submit" disabled="@_isSaving">
-                @(_isSaving ? "Adding…" : "Add task")
-            </button>
-        </div>
-    </form>
-
-    @if (_errorMessage is not null)
+    @if (!_isAuthenticated)
     {
-        <div class="error-panel" role="alert">
-            <p>@_errorMessage</p>
-            <button class="text-button" type="button" @onclick="LoadTasksAsync">Try again</button>
-        </div>
+        <section class="task-list-panel sign-in-panel" aria-labelledby="sign-in-heading">
+            <h2 id="sign-in-heading">Sign in required</h2>
+            <p class="empty-state">Sign in to load and manage tasks assigned to your account.</p>
+            @if (_errorMessage is not null)
+            {
+                <div class="error-panel" role="alert">
+                    <p>@_errorMessage</p>
+                </div>
+            }
+            <button class="primary-button" type="button" disabled="@_isSigningIn" @onclick="SignInAsync">
+                @(_isSigningIn ? "Signing in…" : "Sign in")
+            </button>
+        </section>
     }
+    else
+    {
+        <form class="task-form" @onsubmit="CreateTaskAsync" @onsubmit:preventDefault>
+            <label for="new-task-title">Add a task</label>
+            <div class="task-input-row">
+                <input id="new-task-title"
+                       @bind="_newTitle"
+                       @bind:event="oninput"
+                       maxlength="120"
+                       autocomplete="off"
+                       placeholder="What needs to be done?" />
+                <button class="primary-button" type="submit" disabled="@_isSaving">
+                    @(_isSaving ? "Adding…" : "Add task")
+                </button>
+            </div>
+        </form>
 
-    <section class="task-list-panel" aria-labelledby="task-list-heading">
-        <div class="list-heading">
-            <h2 id="task-list-heading">Task list</h2>
-            <span class="task-count">@_tasks.Count</span>
-        </div>
-
-        @if (_isLoading)
+        @if (_errorMessage is not null)
         {
-            <p class="empty-state" role="status">Loading tasks…</p>
-        }
-        else if (_tasks.Count == 0)
-        {
-            <p class="empty-state">No tasks yet. Add one above to try the shared flow.</p>
-        }
-        else
-        {
-            <ul class="task-list">
-                @foreach (var task in _tasks)
+            <div class="error-panel" role="alert">
+                <p>@_errorMessage</p>
+                @if (_isAuthenticated)
                 {
-                    <li class="task-row">
-                        <div class="task-copy">
-                            <span class="task-title @(task.IsCompleted ? "completed" : null)">@task.Title</span>
-                            <span class="task-date">@task.CreatedAtUtc.ToLocalTime().ToString("g")</span>
-                        </div>
-                        @if (task.IsCompleted)
-                        {
-                            <span class="status-badge">Completed</span>
-                        }
-                        else
-                        {
-                            <button class="text-button" type="button" @onclick="() => CompleteTaskAsync(task.Id)">
-                                Mark complete
-                            </button>
-                        }
-                    </li>
+                    <button class="text-button" type="button" @onclick="LoadTasksAsync">Try again</button>
                 }
-            </ul>
+            </div>
         }
-    </section>
+
+        <section class="task-list-panel" aria-labelledby="task-list-heading">
+            <div class="list-heading">
+                <h2 id="task-list-heading">Task list</h2>
+                <span class="task-count">@_tasks.Count</span>
+            </div>
+
+            @if (_isLoading)
+            {
+                <p class="empty-state" role="status">Loading tasks…</p>
+            }
+            else if (_tasks.Count == 0)
+            {
+                <p class="empty-state">No tasks yet. Add one above to try the shared flow.</p>
+            }
+            else
+            {
+                <ul class="task-list">
+                    @foreach (var task in _tasks)
+                    {
+                        <li class="task-row">
+                            <div class="task-copy">
+                                <span class="task-title @(task.IsCompleted ? "completed" : null)">@task.Title</span>
+                                <span class="task-date">@task.CreatedAtUtc.ToLocalTime().ToString("g")</span>
+                            </div>
+                            @if (task.IsCompleted)
+                            {
+                                <span class="status-badge">Completed</span>
+                            }
+                            else
+                            {
+                                <button class="text-button" type="button" @onclick="() => CompleteTaskAsync(task.Id)">
+                                    Mark complete
+                                </button>
+                            }
+                        </li>
+                    }
+                </ul>
+
+                @if (_hasMore)
+                {
+                    <button class="text-button load-more-button" type="button" @onclick="LoadMoreAsync">
+                        Load more tasks
+                    </button>
+                }
+            }
+        </section>
+    }
 </section>
 
 @code {
     private IReadOnlyList<TaskResponse> _tasks = Array.Empty<TaskResponse>();
     private string _newTitle = string.Empty;
     private string? _errorMessage;
+    private int _currentPage = 1;
     private bool _isLoading = true;
+    private bool _isAuthenticated;
+    private bool _hasMore;
     private bool _isSaving;
+    private bool _isSigningIn;
+    private const int PageSize = 25;
 
-    protected override Task OnInitializedAsync() => LoadTasksAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _isAuthenticated = await AuthenticationSession.IsSignedInAsync();
+        }
+        catch (AuthenticationOperationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+
+        if (_isAuthenticated)
+        {
+            await LoadTasksAsync();
+        }
+        else
+        {
+            _isLoading = false;
+        }
+    }
 
     private async Task LoadTasksAsync()
+    {
+        await LoadTasksPageAsync(page: 1, append: false);
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        if (_hasMore && !_isLoading)
+        {
+            await LoadTasksPageAsync(_currentPage + 1, append: true);
+        }
+    }
+
+    private async Task LoadTasksPageAsync(int page, bool append)
     {
         _isLoading = true;
         _errorMessage = null;
 
         try
         {
-            _tasks = await TasksApiClient.ListAsync();
+            var result = await TasksApiClient.ListAsync(page, PageSize);
+            _tasks = append
+                ? _tasks.Concat(result.Items).ToArray()
+                : result.Items;
+            _currentPage = result.Page;
+            _hasMore = result.HasMore;
+        }
+        catch (AuthenticationRequiredException)
+        {
+            _isAuthenticated = false;
+            _tasks = Array.Empty<TaskResponse>();
+            _hasMore = false;
+            _errorMessage = "Your sign-in session expired. Sign in again to continue.";
         }
         catch (HttpRequestException exception)
         {
+            if (exception.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                _isAuthenticated = false;
+                _tasks = Array.Empty<TaskResponse>();
+                _hasMore = false;
+            }
+
             _errorMessage = DescribeApiFailure(exception);
         }
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    private async Task SignInAsync()
+    {
+        _isSigningIn = true;
+        _errorMessage = null;
+
+        try
+        {
+            await AuthenticationSession.SignInAsync();
+            _isAuthenticated = await AuthenticationSession.IsSignedInAsync();
+            if (_isAuthenticated)
+            {
+                await LoadTasksAsync();
+            }
+        }
+        catch (AuthenticationOperationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        finally
+        {
+            _isSigningIn = false;
+        }
+    }
+
+    private async Task SignOutAsync()
+    {
+        _errorMessage = null;
+
+        try
+        {
+            await AuthenticationSession.SignOutAsync();
+            _isAuthenticated = await AuthenticationSession.IsSignedInAsync();
+            _tasks = Array.Empty<TaskResponse>();
+        }
+        catch (AuthenticationOperationException exception)
+        {
+            _errorMessage = exception.Message;
         }
     }
 
@@ -118,9 +250,14 @@
 
         try
         {
-            var createdTask = await TasksApiClient.CreateAsync(_newTitle);
+            await TasksApiClient.CreateAsync(_newTitle);
             _newTitle = string.Empty;
-            _tasks = new[] { createdTask }.Concat(_tasks).ToArray();
+            await LoadTasksAsync();
+        }
+        catch (AuthenticationRequiredException)
+        {
+            _isAuthenticated = false;
+            _errorMessage = "Your sign-in session expired. Sign in again to continue.";
         }
         catch (TaskApiValidationException exception)
         {
@@ -128,6 +265,13 @@
         }
         catch (HttpRequestException exception)
         {
+            if (exception.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                _isAuthenticated = false;
+                _tasks = Array.Empty<TaskResponse>();
+                _hasMore = false;
+            }
+
             _errorMessage = $"The task could not be saved. {DescribeApiFailure(exception)}";
         }
         finally
@@ -147,17 +291,45 @@
                 .Select(task => task.Id == id ? completedTask : task)
                 .ToArray();
         }
+        catch (AuthenticationRequiredException)
+        {
+            _isAuthenticated = false;
+            _errorMessage = "Your sign-in session expired. Sign in again to continue.";
+        }
         catch (HttpRequestException exception)
         {
+            if (exception.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                _isAuthenticated = false;
+                _tasks = Array.Empty<TaskResponse>();
+                _hasMore = false;
+            }
+
             _errorMessage = $"The task could not be updated. {DescribeApiFailure(exception)}";
         }
     }
 
-    private static string DescribeApiFailure(HttpRequestException exception)
+    private string DescribeApiFailure(HttpRequestException exception)
     {
         if (exception.StatusCode is not { } statusCode)
         {
             return "The API host could not be reached. Start the Web host and retry.";
+        }
+
+        if (statusCode == HttpStatusCode.Unauthorized)
+        {
+            _isAuthenticated = false;
+            return "Your sign-in session expired. Sign in again to continue.";
+        }
+
+        if (statusCode == HttpStatusCode.Forbidden)
+        {
+            return "Your account is signed in but doesn't have the Tasks.ReadWrite permission.";
+        }
+
+        if (statusCode == HttpStatusCode.TooManyRequests)
+        {
+            return "Too many requests were sent. Wait briefly before trying again.";
         }
 
         if (statusCode == HttpStatusCode.NotFound)
