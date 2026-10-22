@@ -1,5 +1,6 @@
 using BlazorMultihostStarter.Client;
 using BlazorMultihostStarter.Client.Authentication;
+using BlazorMultihostStarter.Client.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Maui.Storage;
@@ -45,15 +46,28 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
             });
 
-        builder.Services.AddSingleton(services =>
-            new MauiEntraAuthenticationSession(
-                settingsOptions.Entra,
-                services.GetRequiredService<ILogger<MauiEntraAuthenticationSession>>()));
-        builder.Services.AddSingleton<IUserAuthenticationSession>(services =>
-            services.GetRequiredService<MauiEntraAuthenticationSession>());
-        builder.Services.AddSingleton<IApiAccessTokenProvider>(services =>
-            services.GetRequiredService<MauiEntraAuthenticationSession>());
-        builder.Services.AddTasksApiClient(new Uri(settingsOptions.ApiBaseAddress));
+        if (settingsOptions.Entra.IsValid)
+        {
+            builder.Services.AddSingleton(services =>
+                new MauiEntraAuthenticationSession(
+                    settingsOptions.Entra,
+                    services.GetRequiredService<ILogger<MauiEntraAuthenticationSession>>()));
+            builder.Services.AddSingleton<IUserAuthenticationSession>(services =>
+                services.GetRequiredService<MauiEntraAuthenticationSession>());
+            builder.Services.AddSingleton<IApiAccessTokenProvider>(services =>
+                services.GetRequiredService<MauiEntraAuthenticationSession>());
+            builder.Services.AddTasksApiClient(new Uri(settingsOptions.ApiBaseAddress));
+        }
+        else
+        {
+            builder.Services.AddSingleton<IUserAuthenticationSession>(
+                new UnconfiguredAuthenticationSession(
+                    "Configure valid Entra client IDs to sign in and synchronize server-backed tasks."));
+            builder.Services.AddSingleton<ITasksClient>(
+                new UnconfiguredTasksClient(
+                    "The Tasks API is unavailable until valid Entra client IDs are configured."));
+        }
+
         builder.Services.AddSharedTaskModes();
 
         builder.Services.AddMauiBlazorWebView();

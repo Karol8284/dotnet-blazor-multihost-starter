@@ -70,19 +70,21 @@ dotnet new blazor-multihost-starter `
   --serverClientId <server-client-guid>
 ```
 
-Entra IDs may be omitted during generation; unresolved placeholders make the
-application fail closed until configured. The template generates fresh MAUI
-application and User Secrets GUIDs. `ServerClientSecret` is deliberately not a
-template option: set it in User Secrets or deployment secret storage. All
-three data-mode examples are included; choose by route and remove examples the
-application does not need. The Web rendering mode is selected separately with
-`Web:Interactivity` (`WebAssembly` or `Server`).
+Entra IDs may be omitted during generation to review the client-local route in
+Development. With unresolved placeholders, server-backed API routes return
+`503` and sign-in is unavailable; Production still fails closed. The template
+generates fresh MAUI application and Web User Secrets GUIDs.
+`ServerClientSecret` is deliberately not a template option: set it in User
+Secrets or deployment secret storage. All three data-mode examples are
+included; choose by route and remove examples the application does not need.
+The Web rendering mode is selected separately with `Web:Interactivity`
+(`WebAssembly` or `Server`).
 
 ## Prerequisites
 
 - .NET SDK 10.0.402 or a later feature band in the .NET 10 line.
-- Docker Desktop or another Docker-compatible engine to run the local
-  PostgreSQL database.
+- Docker Desktop or another Docker-compatible engine for server-centric and
+  synchronized PostgreSQL examples; the client-local mode does not need it.
 - For the MAUI app, the workload and platform tooling for the target you want
   to run. On Windows, the Windows target is the simplest starting point.
 
@@ -94,6 +96,11 @@ dotnet tool restore
 ```
 
 ## Run the Web app and API
+
+To review only `/tasks/local` in Development, you can start the Web host without
+Entra IDs or PostgreSQL. The local page remains usable; the server-backed API
+is disabled and responds with `503` until valid Entra IDs and a database
+connection are configured.
 
 ### Configure Microsoft Entra ID first
 
@@ -151,9 +158,10 @@ the platform files to the registered client ID and bundle ID. For Interactive
 Server, register `http://localhost:5080/signin-oidc`. Use HTTPS redirects for
 deployment.
 
-Tenant and client IDs are public identifiers, not secrets. The app never
-accepts anonymous Tasks API requests if Entra configuration is missing or
-invalid; API startup fails closed. The integration tests use a test-only
+Tenant and client IDs are public identifiers, not secrets. The API never
+accepts anonymous Tasks API requests. In Development, missing Entra or database
+configuration disables the API with `503` while local-only routes remain
+usable; Production startup fails closed. The integration tests use a test-only
 authentication handler and do not contact a real tenant.
 Outside Development, the Web host also rejects wildcard `AllowedHosts` and the
 sample local database password.
@@ -188,8 +196,9 @@ or local snapshot.
 
 ## Run the MAUI app
 
-Keep PostgreSQL and the Web/API host running. In another terminal, run the MAUI
-project for a target supported by your machine, for example on Windows:
+For server-centric tasks and sync, keep PostgreSQL and the Web/API host
+running. For a client-local review in Debug, MAUI can start without Entra or
+the Web host; navigate to `/tasks/local`. To run the Windows target:
 
 ```powershell
 dotnet run --project .\src\BlazorMultihostStarter.Maui `

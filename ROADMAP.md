@@ -20,7 +20,7 @@ bramki są wymienione na końcu dokumentu.
   pozostaje Blazor Hybrid.
 - Repozytorium jest instalowalne przez `dotnet new install .`; generator
   zmienia nazwę projektu, app title, bundle ID i publiczne Entra IDs.
-- Lokalnie przechodzą 70 testów w czterech projektach, Release build solution,
+- Lokalnie przechodzą 71 testów w czterech projektach, Release build solution,
   Android Debug, Windows Release, formatowanie i kontrola snapshotu migracji.
 - Browser smoke potwierdził zapis/odczyt IndexedDB po przeładowaniu w
   WebAssembly oraz Interactive Server. To nie obejmuje prawdziwego logowania.

@@ -10,6 +10,13 @@ public static class EntraServerAuthentication
     public const string ServerClientSecretConfigurationKey = "Authentication:Entra:ServerClientSecret";
     public const string CookieScheme = CookieAuthenticationDefaults.AuthenticationScheme;
 
+    public static bool IsConfigured(IConfiguration configuration, string? tenantId) =>
+        Guid.TryParse(tenantId, out var parsedTenantId)
+        && parsedTenantId != Guid.Empty
+        && Guid.TryParse(configuration[ServerClientIdConfigurationKey], out var parsedClientId)
+        && parsedClientId != Guid.Empty
+        && !string.IsNullOrWhiteSpace(configuration[ServerClientSecretConfigurationKey]);
+
     public static IServiceCollection AddEntraInteractiveServerAuthentication(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -17,14 +24,13 @@ public static class EntraServerAuthentication
     {
         var clientId = configuration[ServerClientIdConfigurationKey];
         var clientSecret = configuration[ServerClientSecretConfigurationKey];
-        if (!Guid.TryParse(clientId, out var parsedClientId)
-            || parsedClientId == Guid.Empty
-            || string.IsNullOrWhiteSpace(clientSecret))
+        if (!IsConfigured(configuration, tenantId))
         {
             throw new InvalidOperationException(
                 "Interactive Server requires Authentication:Entra:ServerClientId and ServerClientSecret. Store the secret outside source control.");
         }
 
+        var parsedClientId = Guid.Parse(clientId!);
         services.AddAuthentication(options =>
         {
             options.DefaultAuthenticateScheme = CookieScheme;

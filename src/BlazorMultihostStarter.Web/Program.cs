@@ -14,20 +14,73 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 var webInteractivity = WebInteractivityMode.Parse(builder.Configuration["Web:Interactivity"]);
+var entraApiOptions = builder.Configuration.GetSection(EntraApiOptions.SectionName)
+    .Get<EntraApiOptions>() ?? new EntraApiOptions();
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var apiConfigured = entraApiOptions.IsValid && !string.IsNullOrWhiteSpace(connectionString);
+var serverAuthenticationConfigured = EntraServerAuthentication.IsConfigured(
+    builder.Configuration,
+    entraApiOptions.TenantId);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
 builder.Services.AddOpenApi();
-builder.Services.AddEntraApiAuthentication(builder.Configuration);
+builder.Services.AddAuthentication();
+builder.Services.AddAuthorization();
+
+if (!builder.Environment.IsDevelopment())
+{
+    if (!apiConfigured)
+    {
+        throw new InvalidOperationException(
+            "Configure valid Entra API identifiers and ConnectionStrings:DefaultConnection before starting the Web host outside Development.");
+    }
+
+    ProductionConfiguration.Validate(builder.Configuration, connectionString!);
+    if (webInteractivity == WebInteractivity.Server && !serverAuthenticationConfigured)
+    {
+        throw new InvalidOperationException(
+            "Interactive Server requires a configured confidential Entra client.");
+    }
+}
+
+if (apiConfigured)
+{
+    builder.Services.AddEntraApiAuthentication(builder.Configuration);
+    builder.Services.AddApplication();
+    builder.Services.AddInfrastructure(
+        connectionString!,
+        builder.Configuration["Database:Provider"] ?? "PostgreSQL");
+}
 
 if (webInteractivity == WebInteractivity.Server)
 {
-    var tenantId = builder.Configuration["Authentication:Entra:TenantId"]
-        ?? throw new InvalidOperationException("Configure Authentication:Entra:TenantId.");
-    builder.Services.AddEntraInteractiveServerAuthentication(builder.Configuration, tenantId);
-    builder.Services.AddScoped<IUserAuthenticationSession, ServerAuthenticationSession>();
-    builder.Services.AddScoped<ITasksClient, ServerTasksClient>();
+    if (serverAuthenticationConfigured)
+    {
+        builder.Services.AddEntraInteractiveServerAuthentication(
+            builder.Configuration,
+            entraApiOptions.TenantId);
+        builder.Services.AddScoped<IUserAuthenticationSession, ServerAuthenticationSession>();
+    }
+    else
+    {
+        builder.Services.AddScoped<IUserAuthenticationSession>(_ =>
+            new UnconfiguredAuthenticationSession(
+                "Configure a confidential Entra client to sign in with Interactive Server."));
+    }
+
+    if (apiConfigured && serverAuthenticationConfigured)
+    {
+        builder.Services.AddScoped<ITasksClient, ServerTasksClient>();
+    }
+    else
+    {
+        builder.Services.AddScoped<ITasksClient>(_ =>
+            new UnconfiguredTasksClient(
+                "The Tasks API is unavailable until valid Entra IDs and a database connection are configured."));
+    }
+
     builder.Services.AddSharedTaskModes();
 }
 
@@ -52,25 +105,15 @@ builder.Services.AddRateLimiter(options =>
     });
 });
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException(
-        "Configure the ConnectionStrings:DefaultConnection setting before starting the Web host.");
-var databaseProvider = builder.Configuration["Database:Provider"] ?? "PostgreSQL";
-
-if (!builder.Environment.IsDevelopment())
-{
-    ProductionConfiguration.Validate(builder.Configuration, connectionString);
-}
-
-builder.Services.AddApplication();
-builder.Services.AddInfrastructure(connectionString, databaseProvider);
-
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
     app.UseWebAssemblyDebugging();
-    app.MapOpenApi();
+    if (apiConfigured)
+    {
+        app.MapOpenApi();
+    }
 }
 else
 {
@@ -90,8 +133,25 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
-app.MapTasksModule();
-if (webInteractivity == WebInteractivity.Server)
+if (apiConfigured)
+{
+    app.MapTasksModule();
+}
+else
+{
+    app.Logger.LogWarning(
+        "Tasks API is disabled in Development until valid Entra API identifiers and a database connection string are configured.");
+    app.Map("/api", api => api.Run(async context =>
+    {
+        var problem = Results.Problem(
+            statusCode: StatusCodes.Status503ServiceUnavailable,
+            title: "Tasks API is not configured",
+            detail: "Configure Entra API identifiers and a database connection string to enable server-backed tasks.");
+        await problem.ExecuteAsync(context);
+    }));
+}
+
+if (webInteractivity == WebInteractivity.Server && serverAuthenticationConfigured)
 {
     app.MapServerAuthenticationEndpoints();
 }

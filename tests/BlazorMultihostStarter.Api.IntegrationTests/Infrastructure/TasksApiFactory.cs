@@ -32,8 +32,19 @@ public sealed class TasksApiFactory : WebApplicationFactory<Program>
         var connectionString = _usePostgreSql
             ? Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION")!
             : "Data Source=:memory:";
+        var apiConnectionString = _usePostgreSql
+            ? connectionString
+            : "Host=localhost;Port=5433;Database=blazor_multihost_starter;Username=starter;Password=starter_dev_password";
 
         builder.UseEnvironment("Development");
+        builder.UseSetting("Authentication:Entra:TenantId", TestAuthenticationHandler.TenantId);
+        builder.UseSetting("Authentication:Entra:ApiClientId", TestAuthenticationHandler.ApiClientId);
+        builder.UseSetting("Authentication:Entra:WebClientId", TestAuthenticationHandler.WebClientId);
+        builder.UseSetting("Authentication:Entra:MauiClientId", TestAuthenticationHandler.MauiClientId);
+        builder.UseSetting("Authentication:Entra:ApiScopeName", "Tasks.ReadWrite");
+        builder.UseSetting("ConnectionStrings:DefaultConnection", apiConnectionString);
+        builder.UseSetting("Database:Provider", "PostgreSQL");
+        builder.UseSetting("Web:Interactivity", _useInteractiveServer ? "Server" : "WebAssembly");
         builder.ConfigureAppConfiguration((_, configuration) =>
         {
             configuration.AddInMemoryCollection(new Dictionary<string, string?>

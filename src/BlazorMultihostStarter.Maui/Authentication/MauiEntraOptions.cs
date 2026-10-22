@@ -10,11 +10,15 @@ public sealed class MauiEntraOptions
 
     public void Validate(bool isDevelopment)
     {
-        Entra.Validate();
+        if (!Entra.IsValid && !isDevelopment)
+        {
+            Entra.Validate();
+        }
 
-        if (!Guid.TryParse(MauiEntraRegistration.ClientId, out var configuredClientId)
-            || configuredClientId == Guid.Empty
-            || !string.Equals(Entra.ClientId, MauiEntraRegistration.ClientId, StringComparison.OrdinalIgnoreCase))
+        if (Entra.IsValid
+            && (!Guid.TryParse(MauiEntraRegistration.ClientId, out var configuredClientId)
+                || configuredClientId == Guid.Empty
+                || !string.Equals(Entra.ClientId, MauiEntraRegistration.ClientId, StringComparison.OrdinalIgnoreCase)))
         {
             throw new InvalidOperationException(
                 "Set the MAUI client ID consistently in appsettings.json and MauiEntraOptions.cs before building.");

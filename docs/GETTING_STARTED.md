@@ -3,7 +3,8 @@
 ## Requirements
 
 - .NET SDK `10.0.402` or a later SDK in the .NET 10 feature band.
-- Docker Desktop or a compatible Docker engine for local PostgreSQL.
+- Docker Desktop or a compatible Docker engine for the server-centric and
+  synchronized examples; client-local Development does not require it.
 - A MAUI workload and platform tooling for the host you want to run.
 
 Check the SDK and workloads:
@@ -35,13 +36,17 @@ dotnet new blazor-multihost-starter `
   --serverClientId <server-client-guid>
 ```
 
-The public Entra IDs may be omitted while exploring source, but unresolved
-placeholders deliberately fail authentication validation. The template creates
-new User Secrets and MAUI application GUIDs. It never accepts a client secret
-as a template argument. All data-mode examples are included; choose by route
-and remove examples the application does not need.
+Entra IDs may be omitted while exploring in Development: client-local pages
+remain usable, while sign-in is unavailable and API requests return `503`.
+Production continues to fail closed. The template creates new User Secrets and
+MAUI application GUIDs. It never accepts a client secret as a template
+argument. All data-mode examples are included; choose by route and remove
+examples the application does not need.
 
 ## Start PostgreSQL
+
+PostgreSQL is required for server-centric Tasks and successful hybrid sync.
+Skip this section if you only want to inspect the client-local route.
 
 Copy `.env.example` to `.env`, then start the local database:
 
@@ -54,6 +59,23 @@ The development connection string matches the sample Compose credentials and
 connects to host port `5433` (the container listens on `5432`). Port `5433`
 avoids conflicts with a PostgreSQL server on the default port. These credentials
 are disposable local-development values, not production secrets.
+
+## Run client-local in Development
+
+From the repository root, run the Web host and open the local-only route:
+
+```powershell
+dotnet run --project .\src\BlazorMultihostStarter.Web
+```
+
+Open `http://localhost:5080/tasks/local`. No Entra registration, PostgreSQL
+container, or API is required for this route. The Web host logs that its Tasks
+API is disabled and returns `503` to server-backed API calls; it does not
+enable anonymous API access.
+
+MAUI Debug can also run the `/tasks/local` page without Entra configuration or
+a running Web host. For server-centric tasks and offline synchronization,
+configure Entra and PostgreSQL below.
 
 ## Configure Entra
 
