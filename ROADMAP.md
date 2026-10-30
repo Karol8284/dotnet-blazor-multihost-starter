@@ -14,9 +14,8 @@ WebAssembly/Server oraz instalowalny template `dotnet new`.
 startera referencyjnego, na którym można rozpocząć implementację aplikacji.
 Obsługa obu formatów `--name`, buildy MAUI Windows oraz runtime smoke
 `/tasks/local` w MAUI Windows Debug są potwierdzone. Test runtime potwierdzono
-ręcznie 2026-10-30. CI dla bieżących, nieopublikowanych zmian template'u
-pozostaje do sprawdzenia po pushu i otwarciu PR; nie jest to deklaracja
-gotowości produkcyjnej.
+ręcznie 2026-10-30. GitHub Actions dla PR #2 na commicie `31ad55b` przeszły
+2026-10-30; nie jest to deklaracja gotowości produkcyjnej.
 
 Etapy V1 poniżej zachowują pierwotny plan i uzasadnienie. Aktualne otwarte
 bramki są wymienione na końcu dokumentu.
@@ -70,12 +69,11 @@ zadanie dodane w `/tasks/local` pozostało widoczne po całkowitym zamknięciu i
 ponownym uruchomieniu aplikacji. To potwierdza wyłącznie Windows Debug i lokalny
 IndexedDB; nie weryfikuje logowania, API ani platform mobilnych.
 
-**Bramka wyjścia:** template naming/build regression jest sprawdzany w CI,
-Web local-only działa w obu trybach, a co najmniej jeden wskazany MAUI target
-przechodzi runtime smoke test. Warunek runtime dla Windows Debug jest
-potwierdzony; cała bramka pozostaje otwarta do czasu przejścia CI dla bieżących
-zmian. README i `GETTING_STARTED.md` opisują tylko kroki i platformy faktycznie
-sprawdzone.
+**Wynik bramki (2026-10-30):** CI run 12 dla PR #2 na commicie `31ad55b`
+przeszedł; Web local-only działa w obu trybach, a runtime smoke dla MAUI Windows
+Debug jest potwierdzony. Bramka acceptance jest zamknięta dla tego commita;
+każda kolejna zmiana wymaga ponownego CI. README i `GETTING_STARTED.md` opisują
+tylko kroki i platformy faktycznie sprawdzone.
 
 **Wyniki acceptance (2026-10-28):** wygenerowano świeże projekty
 `ContosoTasks` i `blazor-multihost-starter` z izolowanego template hive na SDK
