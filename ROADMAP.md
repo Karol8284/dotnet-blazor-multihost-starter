@@ -1,12 +1,12 @@
 # Roadmap: dotnet-blazor-multihost-starter
 
 **Stan lokalnego checkoutu (odczyt 2026-10-30):** branch
-`fix/template-naming`, commit `f05ed8a`, śledzi `origin/fix/template-naming`.
-PR #2 do `main` jest otwarty. Working tree zawiera niecommitowane poprawki
-trzech uwag review: dynamiczne wskazanie projektu MAUI w CI, zachowanie kropek
-w nazwie assembly oraz zgodność nazw assembly i ścieżek CSS. Dodano do CI
-przypadek `Contoso.Tasks`; tych zmian nie budowano i nie sprawdzono jeszcze w
-GitHub Actions. Nie utworzono taga ani GitHub Release.
+`fix/template-naming`, commit `d2590c5`, śledzi `origin/fix/template-naming`.
+PR #2 do `main` jest otwarty. GitHub Actions run 14 dla tego commita przeszedł:
+Web, testy API na PostgreSQL, buildy MAUI Windows i Android oraz generowanie i
+buildy template'u dla nazw PascalCase, kebab-case i `Contoso.Tasks`, łącznie
+ze sprawdzeniem nazw assembly i ścieżek assetów. Trzy wątki review są
+rozwiązane. Nie utworzono taga ani GitHub Release.
 
 Checkout zawiera chronione Tasks API, tryby
 server-centric/client-local/offline-hybrid, Web Interactive
@@ -14,10 +14,10 @@ WebAssembly/Server oraz instalowalny template `dotnet new`.
 
 **Cel najbliższego etapu:** doprowadzić template do sprawdzonego, czytelnego
 startera referencyjnego, na którym można rozpocząć implementację aplikacji.
-Obsługa obu formatów `--name`, buildy MAUI Windows oraz runtime smoke
-`/tasks/local` w MAUI Windows Debug są potwierdzone. Test runtime potwierdzono
-ręcznie 2026-10-30. GitHub Actions dla PR #2 na commicie `31ad55b` przeszły
-2026-10-30; nie jest to deklaracja gotowości produkcyjnej.
+Obsługa nazw PascalCase, kebab-case i z kropkami, buildy MAUI Windows oraz
+runtime smoke `/tasks/local` w MAUI Windows Debug są potwierdzone. Test runtime
+potwierdzono ręcznie 2026-10-30. GitHub Actions run 14 dla PR #2 na commicie
+`d2590c5` przeszedł 2026-10-30; nie jest to deklaracja gotowości produkcyjnej.
 
 Etapy V1 poniżej zachowują pierwotny plan i uzasadnienie. Aktualne otwarte
 bramki są wymienione na końcu dokumentu.
