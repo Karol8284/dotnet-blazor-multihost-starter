@@ -112,7 +112,7 @@ jobs:
       - name: Build MAUI Android target
         run: dotnet build "${{ steps.maui_project.outputs.path }}" --framework net10.0-android --configuration Debug
 
-      - name: Generate PascalCase and kebab-case project templates
+      - name: Generate PascalCase, kebab-case, and dotted project templates
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -121,6 +121,11 @@ jobs:
           $null = New-Item -ItemType Directory -Path $templateRoot -Force
           dotnet new --debug:custom-hive $templateHive install . --force
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $templateConfig = Get-Content -LiteralPath '.template.config/template.json' -Raw | ConvertFrom-Json
+          if ($templateConfig.symbols.PSObject.Properties.Name -contains 'serverClientSecret') {
+            throw 'The template must not accept a server client secret as a parameter.'
+          }
 
           $cases = @(
             @{
@@ -210,6 +215,22 @@ jobs:
               throw "Generated stylesheet or shared asset paths do not match the assembly names for '$($case.Name)'."
             }
 
+            $clientRoots = @(
+              (Join-Path $generated "src\$($case.Name).Web.Client"),
+              (Join-Path $generated "src\$($case.Name).Maui")
+            )
+            $serverConfigurationPattern = '(?i)\b(?:ServerClientSecret|ClientSecret|ConnectionStrings|DefaultConnection)\b'
+            foreach ($clientRoot in $clientRoots) {
+              $clientTextFiles = Get-ChildItem -LiteralPath $clientRoot -Recurse -File |
+                Where-Object { $_.Extension -in @('.cs', '.razor', '.json', '.xml', '.xaml', '.html', '.js') }
+              foreach ($clientTextFile in $clientTextFiles) {
+                $clientText = Get-Content -LiteralPath $clientTextFile.FullName -Raw
+                if ([regex]::IsMatch($clientText, $serverConfigurationPattern)) {
+                  throw "Generated client project '$clientRoot' contains server credentials or database configuration."
+                }
+              }
+            }
+
             $textExtensions = @(
               '.cs', '.csx', '.razor', '.css', '.html', '.htm', '.js', '.mjs', '.ts', '.tsx',
               '.jsx', '.json', '.xml', '.xaml', '.csproj', '.sln', '.slnx', '.props', '.targets',
@@ -229,7 +250,7 @@ jobs:
             }
           }
 
-      - name: Build generated PascalCase and kebab-case projects
+      - name: Build generated PascalCase, kebab-case, and dotted projects
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'

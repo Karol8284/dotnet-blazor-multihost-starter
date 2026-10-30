@@ -91,6 +91,19 @@ API scope. Public clients must not have a client secret. Interactive Server
 additionally requires a confidential Web client with the OIDC callback
 `http://localhost:5080/signin-oidc`.
 
+### Configuration safety
+
+| Value | Classification | Where it belongs |
+|---|---|---|
+| Tenant ID, API/Web/MAUI/server client IDs, scope names, and redirect URIs | Public identifiers or protocol metadata; not credentials | Client configuration may contain the IDs/metadata it needs. Redirect URIs must match the registration. |
+| `Authentication:Entra:ServerClientSecret` | Confidential credential | Development User Secrets; deployment secret manager. Never a template parameter, checked-in appsettings value, browser asset, or MAUI asset. |
+| `ConnectionStrings:DefaultConnection` | Server-side database credential | Web/API host only; use User Secrets or environment/secret storage for real credentials. Never include it in Web.Client or MAUI configuration. |
+
+The checked-in Development PostgreSQL settings and `.env.example` use
+disposable local-only sample credentials for the Compose database. They are
+not production credentials; production startup rejects the sample database
+password and wildcard `AllowedHosts`.
+
 Set server-side public identifiers using User Secrets:
 
 ```powershell
