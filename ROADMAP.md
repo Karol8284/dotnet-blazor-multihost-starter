@@ -1,23 +1,25 @@
 # Roadmap: dotnet-blazor-multihost-starter
 
 **Stan lokalnego checkoutu (odczyt 2026-10-30):** branch
-`fix/template-naming`, commit `d2590c5`, śledzi `origin/fix/template-naming`.
-PR #2 do `main` jest otwarty. GitHub Actions run 14 dla tego commita przeszedł:
-Web, testy API na PostgreSQL, buildy MAUI Windows i Android oraz generowanie i
-buildy template'u dla nazw PascalCase, kebab-case i `Contoso.Tasks`, łącznie
-ze sprawdzeniem nazw assembly i ścieżek assetów. Trzy wątki review są
+`fix/template-naming`, commit `83bd14f`, śledzi `origin/fix/template-naming`.
+PR #2 do `main` jest otwarty. GitHub Actions dla tego commita przeszło:
+build i testy Web/API na PostgreSQL, buildy MAUI Windows i Android oraz
+generowanie i buildy template'u dla nazw PascalCase, kebab-case i `Contoso.Tasks`.
+CI sprawdza też zgodność nazw assembly/assetów oraz brak konfiguracji sekretów
+serwera i bazy w wygenerowanych klientach. Trzy wcześniejsze wątki review są
 rozwiązane. Nie utworzono taga ani GitHub Release.
 
 Checkout zawiera chronione Tasks API, tryby
 server-centric/client-local/offline-hybrid, Web Interactive
 WebAssembly/Server oraz instalowalny template `dotnet new`.
 
-**Cel najbliższego etapu:** doprowadzić template do sprawdzonego, czytelnego
-startera referencyjnego, na którym można rozpocząć implementację aplikacji.
-Obsługa nazw PascalCase, kebab-case i z kropkami, buildy MAUI Windows oraz
-runtime smoke `/tasks/local` w MAUI Windows Debug są potwierdzone. Test runtime
-potwierdzono ręcznie 2026-10-30. GitHub Actions run 14 dla PR #2 na commicie
-`d2590c5` przeszedł 2026-10-30; nie jest to deklaracja gotowości produkcyjnej.
+**Cel najbliższego etapu:** utrzymać sprawdzony template referencyjny gotowy
+do użycia i jasno opisać granicę weryfikacji. Generowanie nazw PascalCase,
+kebab-case i z kropkami oraz buildy hostów są potwierdzone. Ręczny smoke
+`/tasks/local` w MAUI Windows Debug potwierdził trwałość IndexedDB po restarcie.
+Prawdziwe logowanie Entra i uwierzytelniony przepływ Web↔MAUI nie zostały
+sprawdzone; użytkownik odłożył ten test do później. Nie deklaruj release'u jako
+zweryfikowanego pod kątem prawdziwego logowania ani jako produkcyjnego.
 
 Etapy V1 poniżej zachowują pierwotny plan i uzasadnienie. Aktualne otwarte
 bramki są wymienione na końcu dokumentu.
@@ -46,7 +48,8 @@ kebab-case. Bieżące wyniki acceptance z 2026-10-28:
 | WebAssembly, `/api/tasks` bez Entra/DB | **Pass** — `503 application/problem+json`, bez anonimowego sukcesu. |
 | Interactive Server, `/tasks/local` | **Pass** — `200`; testowe lokalne zadanie przetrwało reload w IndexedDB. |
 | Interactive Server, `/api/tasks` bez Entra/DB | **Pass** — `503 application/problem+json`. |
-| MAUI Windows runtime i WebView IndexedDB | **Nie sprawdzono** — build jest potwierdzony, ale aplikacji nie uruchomiono interaktywnie. |
+| MAUI Windows runtime i WebView IndexedDB | **Pass** — ręcznie potwierdzono, że zadanie z `/tasks/local` przetrwało pełne zamknięcie i ponowne uruchomienie aplikacji w Debug. |
+| Rzeczywiste logowanie Entra i chronione dane Web↔MAUI | **Odłożone** — nie wykonano smoke testu z prawdziwym testowym tenantem i kontem. |
 | Android/iOS/Mac Catalyst runtime | **Nie sprawdzono** w tej akceptacji. Build CI nie jest runtime smoke testem. |
 
 Przeglądarkowe wpisy testowe używały unikalnych localhost originów. Bazy
@@ -71,11 +74,13 @@ zadanie dodane w `/tasks/local` pozostało widoczne po całkowitym zamknięciu i
 ponownym uruchomieniu aplikacji. To potwierdza wyłącznie Windows Debug i lokalny
 IndexedDB; nie weryfikuje logowania, API ani platform mobilnych.
 
-**Wynik bramki (2026-10-30):** CI run 12 dla PR #2 na commicie `31ad55b`
-przeszedł; Web local-only działa w obu trybach, a runtime smoke dla MAUI Windows
-Debug jest potwierdzony. Bramka acceptance jest zamknięta dla tego commita;
-każda kolejna zmiana wymaga ponownego CI. README i `GETTING_STARTED.md` opisują
-tylko kroki i platformy faktycznie sprawdzone.
+**Wynik bramki (2026-10-30):** GitHub Actions dla PR #2 na commicie `83bd14f`
+przeszło wszystkie wymagane joby. Wygenerowano i zbudowano template dla trzech
+wariantów nazwy; test potwierdził ścieżki assetów i brak ustawień sekretu
+serwera/connection stringa w Web.Client i MAUI. Ręczny Windows Debug smoke
+`/tasks/local` jest potwierdzony. Każda kolejna zmiana wymaga ponownego CI.
+Prawdziwe logowanie i synchronizacja z testowym tenantem nie są częścią
+potwierdzonego wyniku.
 
 **Wyniki acceptance (2026-10-28):** wygenerowano świeże projekty
 `ContosoTasks` i `blazor-multihost-starter` z izolowanego template hive na SDK
@@ -103,30 +108,24 @@ Template zachowuje surową wartość `--name` w ścieżkach i solution, a C#
 namespace'y normalizuje osobno. Regresyjny CI generuje PascalCase i kebab-case,
 sprawdza ścieżki oraz placeholdery i buduje Web oraz MAUI Windows dla obu.
 
-### Następnie — przegląd konfiguracji i bezpieczeństwa
+### Konfiguracja i przegląd sekretów — wykonano, z ograniczeniem zakresu
 
-To osobne zadanie po uzgodnieniu dokładnych wartości, które budzą wątpliwość;
-na tym etapie nie zmieniaj ich automatycznie.
+- Konfigurację identity i bazy zinwentaryzowano. Tabela klasyfikująca publiczne
+  identyfikatory, client secret i connection string znajduje się w
+  [GETTING_STARTED](./docs/GETTING_STARTED.md#configuration-safety).
+- Publiczne Client ID, Tenant ID, scope i URI przekierowania są metadanymi,
+  nie poświadczeniami. `ServerClientSecret` i prawdziwy connection string są
+  poufnymi wartościami serwerowymi; nie są parametrami template'u i nie mogą
+  trafić do Web.Client ani MAUI.
+- GitHub Actions sprawdza wygenerowany template i zatrzymuje CI, jeśli
+  konfiguracja sekretu serwera lub bazy pojawi się w plikach klienta.
+- Wykonano ukierunkowany, lokalny przegląd wzorców po bieżących plikach i
+  śledzonej historii Git. Nie znaleziono potwierdzonego prawdziwego sekretu;
+  przykładowe poświadczenia Compose i testowe fixture'y są celowo
+  nieprodukcyjne. To nie jest pełny audyt historii wszystkich zdalnych gałęzi
+  ani poświadczenie wyniku GitHub Secret Scanning.
 
-- Zinwentaryzować konfigurację identity i API w Web, Web.Client, MAUI,
-  `.template.config`, plikach `appsettings` i wygenerowanym projekcie.
-- Rozróżnić publiczne identyfikatory/konfigurację klienta od sekretów i
-  prywatnych kluczy. Publiczny client ID, tenant ID, URI przekierowania czy
-  publiczny klucz/certyfikat nie są automatycznie sekretem. Klucz prywatny,
-  client secret, hasło lub token wymaga ochrony i nie powinien trafić do
-  klienta ani repozytorium.
-- Sprawdzić, czy prawdziwy sekret przypadkiem nie został już opublikowany.
-  Samo usunięcie go z bieżącego pliku nie unieważnia ujawnionego sekretu —
-  w takim przypadku trzeba go unieważnić/wymienić i ocenić historię repo.
-- Zaktualizować instrukcje i testy konfiguracji po ustaleniu konkretnego
-  problemu. Nie usuwać prawidłowych publicznych identyfikatorów z klienta tylko
-  dlatego, że nazywają się „key” lub są widoczne w bundle.
-
-**Bramka wyjścia:** tabela konfiguracji wyjaśnia dla każdej wartości, czy jest
-publiczna, poufna, gdzie jest używana i jak jest dostarczana; test potwierdza,
-że wymagane sekrety nie są generowane do Web/MAUI client bundle.
-
-### Potem — runtime uwierzytelniania i danych
+### Odłożone — rzeczywiste uwierzytelnianie i przepływ danych
 
 Wymaga testowego tenant'u Entra, zarejestrowanych callbacków, testowej bazy
 PostgreSQL i świadomie wybranych platform. Sekrety pozostają w lokalnym
@@ -141,9 +140,24 @@ User Secrets/secret managerze — nie należy wklejać ich do rozmowy ani commit
 - Zapisać osobny wynik dla każdego hosta/platformy; testowa identity handler
   nie zastępuje testu z prawdziwym Entra.
 
-**Bramka wyjścia:** każdy deklarowany host przechodzi zapisany smoke test z
-testowym użytkownikiem i bazą; README wskazuje dokładnie sprawdzone platformy
-i nadal nazywa ograniczenia.
+Użytkownik potwierdził, że ma testowy tenant/aplikacje, konto i bazę, ale
+odłożył wykonanie smoke testu. Przed przypisaniem statusu „V1 z
+uwierzytelnionym przepływem zweryfikowanym” przypomnij o:
+
+1. WebAssembly: sign-in, zadanie przez chronione API, sign-out.
+2. Interactive Server: OIDC/cookie, odczyt i zapis zadania.
+3. MAUI Windows i wybrana platforma Android: broker/callback, chronione API.
+4. Ten sam użytkownik i baza: utworzenie w Web, odczyt/ukończenie w MAUI;
+   offline sync, konflikt `409` i jawne rozwiązanie.
+
+Nie wklejaj do czatu client secret, tokenów ani connection stringa. Konfigurację
+testową podaj lokalnie przez User Secrets/secret manager. Docker Compose w tym
+repozytorium uruchamia wyłącznie PostgreSQL i nadal zużywa lokalne zasoby;
+ciężkie buildy i testy powinny pozostać w GitHub Actions.
+
+**Bramka wyjścia:** każdy host deklarowany jako sprawdzony przechodzi zapisany
+smoke test z testowym użytkownikiem i bazą; README opisuje tylko potwierdzone
+platformy i ograniczenia.
 
 ### Produkcyjność — oddzielna decyzja, nie domyślny następny sprint
 
