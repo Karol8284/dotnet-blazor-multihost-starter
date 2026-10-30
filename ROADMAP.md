@@ -1,13 +1,13 @@
 # Roadmap: dotnet-blazor-multihost-starter
 
-**Stan lokalnego checkoutu (odczyt 2026-10-30):** branch
-`fix/template-naming`, commit `83bd14f`, śledzi `origin/fix/template-naming`.
-PR #2 do `main` jest otwarty. GitHub Actions dla tego commita przeszło:
-build i testy Web/API na PostgreSQL, buildy MAUI Windows i Android oraz
-generowanie i buildy template'u dla nazw PascalCase, kebab-case i `Contoso.Tasks`.
-CI sprawdza też zgodność nazw assembly/assetów oraz brak konfiguracji sekretów
-serwera i bazy w wygenerowanych klientach. Trzy wcześniejsze wątki review są
-rozwiązane. Nie utworzono taga ani GitHub Release.
+**Stan PR (2026-10-30):** branch `fix/template-naming` otwiera PR #2 do `main`.
+GitHub Actions dla zmian źródłowych (`83bd14f`) oraz późniejszej aktualizacji
+roadmapy (`222b13c`) przeszło: build i testy Web/API na PostgreSQL, buildy MAUI
+Windows i Android oraz generowanie i buildy template'u dla nazw PascalCase,
+kebab-case i `Contoso.Tasks`. CI sprawdza też zgodność nazw assembly/assetów
+oraz brak konfiguracji sekretów serwera i bazy w wygenerowanych klientach.
+Trzy wcześniejsze wątki review są rozwiązane. Nie utworzono taga ani GitHub
+Release.
 
 Checkout zawiera chronione Tasks API, tryby
 server-centric/client-local/offline-hybrid, Web Interactive
