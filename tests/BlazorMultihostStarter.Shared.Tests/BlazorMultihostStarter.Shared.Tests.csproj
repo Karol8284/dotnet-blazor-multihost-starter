@@ -13,9 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\BlazorMultihostStarter.Client\BlazorMultihostStarter.Client.csproj" />
-    <ProjectReference Include="..\..\src\BlazorMultihostStarter.Contracts\BlazorMultihostStarter.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\BlazorMultihostStarter.Shared\BlazorMultihostStarter.Shared.csproj" />
+    <ProjectReference Include="..\..\src\$(StarterProjectName).Client\$(StarterProjectName).Client.csproj" />
+    <ProjectReference Include="..\..\src\$(StarterProjectName).Contracts\$(StarterProjectName).Contracts.csproj" />
+    <ProjectReference Include="..\..\src\$(StarterProjectName).Shared\$(StarterProjectName).Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>

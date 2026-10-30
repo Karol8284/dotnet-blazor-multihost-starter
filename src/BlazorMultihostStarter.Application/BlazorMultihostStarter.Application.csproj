@@ -8,6 +8,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\BlazorMultihostStarter.Domain\BlazorMultihostStarter.Domain.csproj" />
+    <ProjectReference Include="..\$(StarterProjectName).Domain\$(StarterProjectName).Domain.csproj" />
   </ItemGroup>
 </Project>

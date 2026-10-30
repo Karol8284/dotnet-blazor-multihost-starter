@@ -70,6 +70,12 @@ dotnet new blazor-multihost-starter `
   --serverClientId <server-client-guid>
 ```
 
+The `--name` value can use PascalCase (for example `ContosoTasks`) or kebab-case
+(for example `contoso-tasks`). C# namespaces use a valid identifier form while
+project folders and references retain the supplied name. The generated MAUI
+project is in `src\<name>.Maui\`, and its project file is named
+`<name>.csproj` (for example `src\ContosoTasks.Maui\ContosoTasks.csproj`).
+
 Entra IDs may be omitted during generation to review the client-local route in
 Development. With unresolved placeholders, server-backed API routes return
 `503` and sign-in is unavailable; Production still fails closed. The template
@@ -218,7 +224,7 @@ is the device itself. Release builds require an HTTPS API address. See
 ```powershell
 dotnet build .\src\BlazorMultihostStarter.Web\BlazorMultihostStarter.Web.csproj `
   --configuration Release
-dotnet build .\src\BlazorMultihostStarter.Maui\BlazorMultihostStarter.Maui.csproj `
+dotnet build .\src\BlazorMultihostStarter.Maui `
   --framework net10.0-windows10.0.19041.0 `
   --configuration Release
 dotnet test .\tests\BlazorMultihostStarter.Domain.Tests\BlazorMultihostStarter.Domain.Tests.csproj `
