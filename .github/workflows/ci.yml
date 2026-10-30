@@ -85,14 +85,32 @@ jobs:
         with:
           dotnet-version: 10.0.402
 
+      - name: Resolve MAUI project path
+        id: maui_project
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $mauiDirectories = @(Get-ChildItem -LiteralPath 'src' -Directory |
+            Where-Object { $_.Name.EndsWith('.Maui', [StringComparison]::OrdinalIgnoreCase) })
+          if ($mauiDirectories.Count -ne 1) {
+            throw "Expected one MAUI project directory under src, found $($mauiDirectories.Count)."
+          }
+
+          $mauiProjects = @(Get-ChildItem -LiteralPath $mauiDirectories[0].FullName -Filter '*.csproj' -File)
+          if ($mauiProjects.Count -ne 1) {
+            throw "Expected one MAUI project file in '$($mauiDirectories[0].FullName)', found $($mauiProjects.Count)."
+          }
+
+          "path=$($mauiProjects[0].FullName)" >> $env:GITHUB_OUTPUT
+
       - name: Restore MAUI workloads
-        run: dotnet workload restore src/BlazorMultihostStarter.Maui/BlazorMultihostStarter.Maui.csproj
+        run: dotnet workload restore "${{ steps.maui_project.outputs.path }}"
 
       - name: Build MAUI Windows target
-        run: dotnet build src/BlazorMultihostStarter.Maui/BlazorMultihostStarter.Maui.csproj --framework net10.0-windows10.0.19041.0 --configuration Release
+        run: dotnet build "${{ steps.maui_project.outputs.path }}" --framework net10.0-windows10.0.19041.0 --configuration Release
 
       - name: Build MAUI Android target
-        run: dotnet build src/BlazorMultihostStarter.Maui/BlazorMultihostStarter.Maui.csproj --framework net10.0-android --configuration Debug
+        run: dotnet build "${{ steps.maui_project.outputs.path }}" --framework net10.0-android --configuration Debug
 
       - name: Generate PascalCase and kebab-case project templates
         shell: pwsh
@@ -114,6 +132,11 @@ jobs:
               Name = 'blazor-multihost-starter'
               AppTitle = 'Blazor Multihost Starter'
               BundleId = 'com.example.blazormultihoststarter'
+            },
+            @{
+              Name = 'Contoso.Tasks'
+              AppTitle = 'Contoso Tasks'
+              BundleId = 'com.example.contoso.tasks'
             }
           )
 
@@ -154,6 +177,39 @@ jobs:
               }
             }
 
+            $safeProjectName = [regex]::Replace($case.Name, '[^A-Za-z0-9.]', '_')
+            $assemblyChecks = @(
+              @{
+                Path = "src\$($case.Name).Shared\$($case.Name).Shared.csproj"
+                Expected = "$safeProjectName.Shared"
+              },
+              @{
+                Path = "src\$($case.Name).Web\$($case.Name).Web.csproj"
+                Expected = "$safeProjectName.Web"
+              },
+              @{
+                Path = "src\$($case.Name).Maui\$($case.Name).csproj"
+                Expected = $safeProjectName
+              }
+            )
+            foreach ($assemblyCheck in $assemblyChecks) {
+              $assemblyName = dotnet msbuild (Join-Path $generated $assemblyCheck.Path) -getProperty:AssemblyName -nologo
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              if ($assemblyName.Trim() -ne $assemblyCheck.Expected) {
+                throw "Expected assembly '$($assemblyCheck.Expected)' but found '$($assemblyName.Trim())' in '$($assemblyCheck.Path)'."
+              }
+            }
+
+            $sharedAssetPath = "_content/$safeProjectName.Shared/app.css"
+            $webApp = Get-Content -LiteralPath (Join-Path $generated "src\$($case.Name).Web\Components\App.razor") -Raw
+            $mauiIndex = Get-Content -LiteralPath (Join-Path $generated "src\$($case.Name).Maui\wwwroot\index.html") -Raw
+            if (-not $webApp.Contains($sharedAssetPath) -or
+                -not $mauiIndex.Contains($sharedAssetPath) -or
+                -not $webApp.Contains("$safeProjectName.Web.styles.css") -or
+                -not $mauiIndex.Contains("$safeProjectName.styles.css")) {
+              throw "Generated stylesheet or shared asset paths do not match the assembly names for '$($case.Name)'."
+            }
+
             $textExtensions = @(
               '.cs', '.csx', '.razor', '.css', '.html', '.htm', '.js', '.mjs', '.ts', '.tsx',
               '.jsx', '.json', '.xml', '.xaml', '.csproj', '.sln', '.slnx', '.props', '.targets',
@@ -178,7 +234,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $templateRoot = Join-Path $env:RUNNER_TEMP 'BlazorMultihostTemplateSmoke'
-          foreach ($projectName in @('ContosoTasks', 'blazor-multihost-starter')) {
+          foreach ($projectName in @('ContosoTasks', 'blazor-multihost-starter', 'Contoso.Tasks')) {
             $generated = Join-Path $templateRoot $projectName
             dotnet build (Join-Path $generated "src\$projectName.Web\$projectName.Web.csproj") --configuration Release
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

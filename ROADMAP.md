@@ -1,12 +1,14 @@
 # Roadmap: dotnet-blazor-multihost-starter
 
-**Stan lokalnego checkoutu (odczyt 2026-10-28):** branch
-`feature/oidc-secure-tasks`, commit
-`3811b9d87ec2a8681a35d16b06df99192a5eee45`, branch śledzi `origin/main`.
-Nie wykonano `fetch`, więc ten zapis nie potwierdza późniejszych zmian zdalnego
-repozytorium. Working tree zawiera nieopublikowane poprawki V1 template'u,
-referencji projektów, MAUI hosta, CI i dokumentacji; nie utworzono jeszcze taga
-ani GitHub Release. Checkout zawiera chroniony Tasks API, tryby
+**Stan lokalnego checkoutu (odczyt 2026-10-30):** branch
+`fix/template-naming`, commit `f05ed8a`, śledzi `origin/fix/template-naming`.
+PR #2 do `main` jest otwarty. Working tree zawiera niecommitowane poprawki
+trzech uwag review: dynamiczne wskazanie projektu MAUI w CI, zachowanie kropek
+w nazwie assembly oraz zgodność nazw assembly i ścieżek CSS. Dodano do CI
+przypadek `Contoso.Tasks`; tych zmian nie budowano i nie sprawdzono jeszcze w
+GitHub Actions. Nie utworzono taga ani GitHub Release.
+
+Checkout zawiera chronione Tasks API, tryby
 server-centric/client-local/offline-hybrid, Web Interactive
 WebAssembly/Server oraz instalowalny template `dotnet new`.
 

@@ -12,6 +12,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableDefaultCssItems>false</EnableDefaultCssItems>
     <Nullable>enable</Nullable>
+    <AssemblyName>$(StarterSafeProjectName)</AssemblyName>
 
     <!-- Display name -->
     <ApplicationTitle>Blazor Multihost Starter</ApplicationTitle>

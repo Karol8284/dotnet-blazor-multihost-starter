@@ -36,11 +36,11 @@ dotnet new blazor-multihost-starter `
   --serverClientId <server-client-guid>
 ```
 
-`--name` supports PascalCase and kebab-case project names. C# namespaces are
-converted to valid identifiers. The generated MAUI project directory is
-`src\<name>.Maui`, while the project file is `src\<name>.Maui\<name>.csproj`;
-for example, `ContosoTasks` generates
-`src\ContosoTasks.Maui\ContosoTasks.csproj`.
+`--name` supports PascalCase, kebab-case, and dotted project names. C#
+namespaces are converted to valid identifiers. The generated MAUI project
+directory is `src\<name>.Maui`, while the project file is
+`src\<name>.Maui\<name>.csproj`; for example, `Contoso.Tasks` generates
+`src\Contoso.Tasks.Maui\Contoso.Tasks.csproj`.
 
 Entra IDs may be omitted while exploring in Development: client-local pages
 remain usable, while sign-in is unavailable and API requests return `503`.

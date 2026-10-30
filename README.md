@@ -70,11 +70,12 @@ dotnet new blazor-multihost-starter `
   --serverClientId <server-client-guid>
 ```
 
-The `--name` value can use PascalCase (for example `ContosoTasks`) or kebab-case
-(for example `contoso-tasks`). C# namespaces use a valid identifier form while
-project folders and references retain the supplied name. The generated MAUI
-project is in `src\<name>.Maui\`, and its project file is named
-`<name>.csproj` (for example `src\ContosoTasks.Maui\ContosoTasks.csproj`).
+The `--name` value can use PascalCase (for example `ContosoTasks`), kebab-case
+(for example `contoso-tasks`), or dots (for example `Contoso.Tasks`). C#
+namespaces use a valid identifier form while project folders and references
+retain the supplied name. The generated MAUI project is in `src\<name>.Maui\`,
+and its project file is named `<name>.csproj` (for example
+`src\ContosoTasks.Maui\ContosoTasks.csproj`).
 
 Entra IDs may be omitted during generation to review the client-local route in
 Development. With unresolved placeholders, server-backed API routes return
