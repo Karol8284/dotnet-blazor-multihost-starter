@@ -18,8 +18,10 @@ do użycia i jasno opisać granicę weryfikacji. Generowanie nazw PascalCase,
 kebab-case i z kropkami oraz buildy hostów są potwierdzone. Ręczny smoke
 `/tasks/local` w MAUI Windows Debug potwierdził trwałość IndexedDB po restarcie.
 Prawdziwe logowanie Entra i uwierzytelniony przepływ Web↔MAUI nie zostały
-sprawdzone; użytkownik odłożył ten test do później. Nie deklaruj release'u jako
-zweryfikowanego pod kątem prawdziwego logowania ani jako produkcyjnego.
+sprawdzone. Wybrany zakres smoke testu obejmuje WebAssembly, Interactive
+Server, MAUI Windows i emulator Android, ale lokalna konfiguracja testowa nie
+jest jeszcze gotowa. Nie deklaruj release'u jako zweryfikowanego pod kątem
+prawdziwego logowania ani jako produkcyjnego.
 
 Etapy V1 poniżej zachowują pierwotny plan i uzasadnienie. Aktualne otwarte
 bramki są wymienione na końcu dokumentu.
@@ -130,25 +132,35 @@ sprawdza ścieżki oraz placeholdery i buduje Web oraz MAUI Windows dla obu.
 Wymaga testowego tenant'u Entra, zarejestrowanych callbacków, testowej bazy
 PostgreSQL i świadomie wybranych platform. Sekrety pozostają w lokalnym
 User Secrets/secret managerze — nie należy wklejać ich do rozmowy ani commitować.
+Szczegółowe kroki i oczekiwane wyniki opisuje
+[manualny smoke test](./docs/GETTING_STARTED.md#manual-authenticated-smoke-test).
 
 - Sprawdzić sign-in/sign-out i wywołanie chronionego API w WebAssembly.
 - Sprawdzić OIDC/cookie i wywołanie Application w Interactive Server.
-- Sprawdzić MAUI sign-in, callback/broker i chronione API na wybranym
-  urządzeniu/emulatorze.
-- Wykonać Web↔MAUI golden path oraz offline sync: `Pending`, `Synced`,
-  nieaktualna wersja `409 Conflict` i obie decyzje rozstrzygnięcia.
+- Sprawdzić MAUI sign-in, callback/broker i chronione API na Windows oraz
+  emulatorze Android.
+- Wykonać Web↔MAUI golden path na tym samym koncie i bazie.
+- Potwierdzić live przejście kolejki offline `Pending` → `Synced`.
+- Weryfikować API `409 Conflict` i obie decyzje rozwiązania automatycznie:
+  testy Shared obejmują `Keep server` oraz `Keep local and retry`, a test
+  integracyjny API sprawdza odpowiedź ze snapshotem serwera.
+- Nie wymagać live `409` przez zwykły UI: osobne lokalne kolejki nie importują
+  istniejącego zadania z serwera, więc nie da się standardowo przygotować
+  identycznego snapshotu bazowego na dwóch urządzeniach.
 - Zapisać osobny wynik dla każdego hosta/platformy; testowa identity handler
   nie zastępuje testu z prawdziwym Entra.
 
-Użytkownik potwierdził, że ma testowy tenant/aplikacje, konto i bazę, ale
-odłożył wykonanie smoke testu. Przed przypisaniem statusu „V1 z
-uwierzytelnionym przepływem zweryfikowanym” przypomnij o:
+Wybrane platformy smoke testu to WebAssembly, Interactive Server, MAUI Windows
+i emulator Android. Lokalna konfiguracja testowa nie jest jeszcze gotowa.
+Przed przypisaniem statusu „V1 z uwierzytelnionym przepływem zweryfikowanym”
+potwierdź:
 
 1. WebAssembly: sign-in, zadanie przez chronione API, sign-out.
 2. Interactive Server: OIDC/cookie, odczyt i zapis zadania.
-3. MAUI Windows i wybrana platforma Android: broker/callback, chronione API.
+3. MAUI Windows i Android: broker/callback, chronione API.
 4. Ten sam użytkownik i baza: utworzenie w Web, odczyt/ukończenie w MAUI;
-   offline sync, konflikt `409` i jawne rozwiązanie.
+   live offline sync `Pending` → `Synced`; konflikt `409` i jawne rozwiązania
+   potwierdzone testami automatycznymi.
 
 Nie wklejaj do czatu client secret, tokenów ani connection stringa. Konfigurację
 testową podaj lokalnie przez User Secrets/secret manager. Docker Compose w tym
@@ -234,6 +246,257 @@ Szczegóły decyzji i ograniczeń platformowych opisuje
   testowa identity handler nie jest jego zamiennikiem.
 - Weryfikacja IndexedDB na każdej deklarowanej platformie MAUI pozostaje osobną
   bramką.
+
+## V3 — zweryfikowany starter pre-production (bez claimu production)
+
+**Cel:** doprowadzić istniejący starter do powtarzalnej akceptacji na
+wybranych hostach, bez dodawania modułów biznesowych i bez deklarowania
+gotowości produkcyjnej.
+
+### Zakres V3
+
+- Zachować obecne granice architektury, Entra ID, PostgreSQL i trzy jawne tryby
+  danych. Nie dodawać nowego providera ani modułu bez konkretnej luki
+  wykazanej przez acceptance.
+- Utrzymywać automatyczne regresje dla fail-closed API, wymaganych claims i
+  scope, izolacji właściciela, limitu per-user `429`, migracji oraz
+  wersjonowanej synchronizacji. Obie decyzje `Keep server` i
+  `Keep local and retry` sprawdzać testami Shared; API integration test
+  sprawdza odpowiedź `409` ze snapshotem serwera.
+- Przeprowadzić rzeczywisty smoke Entra i golden path na wybranym zestawie:
+  WebAssembly, Interactive Server, MAUI Windows i emulator Android. Do
+  potwierdzenia parytetu używać tego samego testowego użytkownika i bazy.
+- Sprawdzić w runtime przejście offline `Pending` → `Synced` oraz wejście
+  użytkownika przez pointer/touch i klawiaturę. Nie zastępować tych kontroli
+  wywołaniem DOM `button.click()`.
+- Dokumentować osobno wyniki build/test i rzeczywistego logowania. Testowa
+  identity handler ani build platformy nie potwierdzają sign-in/brokera.
+
+### Bramki wyjścia V3
+
+1. Wszystkie cztery projekty testowe przechodzą; testy API przechodzą również
+   na PostgreSQL w CI, a snapshot migracji nie ma niezapisanych zmian.
+2. CI przechodzi build Web, MAUI Windows/Android oraz generowanie/build
+   template'u dla obsługiwanych nazw.
+3. Rzeczywisty sign-in, chronione odczyty/zapisy i cross-host golden path są
+   zapisane osobno dla każdego z czterech wybranych hostów.
+4. Offline `Pending` → `Synced` jest potwierdzone w runtime; konflikt `409`
+   oraz obie decyzje rozwiązania są potwierdzone testami automatycznymi.
+5. README i roadmapa opisują wyłącznie zweryfikowane hosty. Starter nadal jest
+   opisany jako reference/pre-production, nie jako produkcyjny.
+
+### Poza V3 bez wyboru środowiska
+
+Deployment, konkretne redirect URI dla hostingu, magazyn sekretów wdrożenia,
+backup/restore, telemetria i alerty, skalowanie oraz rozproszony rate limiter
+pozostają osobną decyzją. Nie zmieniaj limitu per-process ani nie dodawaj
+infrastruktury specyficznej dla chmury, dopóki nie zostanie wybrane docelowe
+środowisko i model operacyjny.
+
+**Stan:** test `Keep server` i procedura manualnego smoke są przygotowane.
+Lokalna walidacja po dodaniu testu: 73/73 testów w czterech projektach,
+Web Release, MAUI Windows Release i Android Debug przeszły bez ostrzeżeń i
+błędów; `dotnet ef migrations has-pending-model-changes` nie wykrył zmian.
+Nie uruchomiono lokalnej bazy PostgreSQL ani prawdziwego logowania. Zintegrowana
+przeglądarka nie wykonała wiarygodnie Enter/kliknięcia, więc interakcja
+pointer/keyboard nadal wymaga potwierdzenia na prawdziwym urządzeniu lub
+stabilnym harnessie przeglądarkowym. Rzeczywiste logowanie pozostaje
+niezweryfikowane, ponieważ lokalna konfiguracja testowa nie jest gotowa.
+V3 nie jest ukończone do czasu przejścia bramek runtime i CI powyżej.
+
+## Plan wersji produkcyjnej template'u do nauki i rozwoju nowych projektów
+
+### Cel i znaczenie „produkcyjny”
+
+Głównym produktem jest instalowalny `dotnet new` template, z którego można
+szybko generować nowe aplikacje. Repozytorium i przykładowy Tasks są
+referencyjnym projektem do nauki oraz testowania wygenerowanego wyniku, a nie
+produktem biznesowym, który trzeba rozwijać w nieskończoność. Portfolio ma
+pokazywać powtarzalny proces od wymagań i wyborów architektonicznych, przez
+implementację i testy, po wdrożenie i utrzymanie.
+
+Weryfikacyjny przykład jest mały — do 10 użytkowników, dane syntetyczne,
+prywatna dystrybucja i minimalne koszty. Każda nowa aplikacja wygenerowana z
+template'u musi jednak przejść własną ocenę ryzyka i wymagań.
+
+To oznacza **produkcyjne praktyki w małym profilu**, a nie obietnicę
+nieprzerwanej dostępności ani uniwersalną „gotowość produkcyjną” dla każdej
+przyszłej aplikacji. Każdy rzeczywisty produkt nadal wymaga własnych wymagań
+dostępności, prywatności, skali, budżetu i procedur operacyjnych.
+
+Domyślna ścieżka pozostaje lokalna i prywatna. Chmura jest opcjonalnym
+demonstratorem dla CV. Nie otwieraj domowego serwera na Internet przez
+przekierowanie portów; dostęp spoza sieci lokalnej wymaga później świadomie
+wybranego, bezpiecznego rozwiązania.
+
+### V4 — produkcyjny baseline wielokrotnego użytku
+
+**Cel:** potraktować wygenerowany projekt jako główny kontrakt jakości:
+użytkownik template'u ma otrzymać zrozumiały, powtarzalny projekt, który da
+się skonfigurować i zweryfikować bez ręcznego łatania.
+
+1. **Kontrakt i granice template'u**
+   - Zdecydować, co zawsze należy do bazowego wygenerowanego projektu, a co
+     pozostaje przykładem lub opcją: hosty, RCL, warstwy backendu, Entra,
+     PostgreSQL i tryby danych.
+   - Traktować `Tasks` jako samodzielny, opisany vertical slice do skopiowania,
+     zastąpienia albo usunięcia, nie jako wymaganą domenę przyszłych aplikacji.
+   - Preferować mały, spójny i jawnie opinionated baseline. Dodawać opcje
+     generatora tylko dla powtarzalnych wariantów potwierdzonych przypadkiem
+     użycia; nie budować generycznego frameworka dla hipotetycznych potrzeb.
+   - Zapisać decyzje o zawartości bazowej i opcjonalnej w ADR oraz pokazać,
+     jak bezpiecznie rozpocząć nową aplikację od wygenerowanego projektu.
+
+2. **Domknięcie V3 i platform**
+   - Ukończyć automatyczne bramki CI oraz prawdziwy login i chroniony przepływ
+     Web/API dla hostów faktycznie deklarowanych jako sprawdzone.
+   - Utrzymać Windows i Android jako hosty budowane na Windows. iOS i Mac
+     Catalyst wymagają dostępu do macOS/Xcode; zaplanować osobny build/runtime
+     acceptance na Macu przed oznaczeniem ich jako wspieranych. Zobacz
+     [wymagania platform MAUI](https://learn.microsoft.com/en-us/dotnet/maui/supported-platforms?view=net-maui-10.0).
+   - Azure nie hostuje aplikacji MAUI: Azure może hostować Web/API i bazę,
+     natomiast klient MAUI jest budowany i uruchamiany na urządzeniu
+     użytkownika. Subskrypcja studencka nie zastępuje wymagań platformowych
+     MAUI.
+
+3. **Jakość wygenerowanego projektu**
+   - Testować generację czystego projektu dla obsługiwanych nazw, restore,
+     build, testy i brak nierozwiązanych placeholderów.
+   - W CI traktować świeżo wygenerowaną aplikację jako osobny subject testów:
+     instalować template w izolowanym hive, generować projekt, sprawdzać jego
+     ścieżki/referencje/konfigurację i budować go bez odwołań do checkoutu
+     template'u.
+   - Potwierdzić, że opcje generatora mają stabilne wartości domyślne i
+     walidację, a dokumentacja wygenerowanej aplikacji mówi, które wartości
+     użytkownik musi skonfigurować samodzielnie.
+   - Rozdzielić konfigurację Development i wdrożenia; walidować wymagane
+     wartości przy starcie i nie umieszczać sekretów w klientach, template
+     parameters ani wygenerowanych plikach.
+   - Dokumentować aktualizacje SDK/pakietów, migracje i kompatybilność
+     wygenerowanych projektów.
+
+4. **Bezpieczeństwo i niezawodność baseline'u**
+   - Zachować autoryzację Entra, izolację danych per owner, walidację, limity
+     wejścia i jawne odpowiedzi błędów; rozszerzać testy negatywne wraz ze
+     zmianami.
+   - Zweryfikować ustawienia cookies, HTTPS, redirect URI, konfigurację
+     `AllowedHosts`, politykę CORS (jeśli topologia jej wymaga) i logowanie bez
+     tokenów/sekretów.
+   - Dodać osobne health/readiness kontrole dla Web/API i bazy, diagnostykę
+     błędów oraz jawny proces wdrażania migracji. Aplikacja nie powinna
+     automatycznie zmieniać produkcyjnej bazy przy starcie.
+   - Opisać backup/restore i wykonać próbę odtworzenia danych testowych.
+     Szyfrowanie i przechowywanie lokalne nie mogą być przedstawiane jako
+     bezpieczny magazyn danych wrażliwych.
+
+5. **CI i wydania template'u**
+   - Utrzymać testy i buildy Web/API, MAUI i wygenerowanego template'u.
+   - Dodać odpowiednie dla .NET kontrole sekretów i podatności zależności oraz
+     publikować jednoznaczne artefakty release.
+   - Dla Apple targets użyć runnera/macOS tylko po potwierdzeniu dostępności i
+     kosztu. Wydanie sklepowe nie należy do prywatnego zakresu.
+
+6. **Dokumentacja ucząca i użycie od zera**
+   - Dla każdej granicy pokazać: kto jest właścicielem odpowiedzialności,
+     jakie niezmienniki obowiązują, co może zawieść, jak to testować i jakie
+     są kompromisy.
+   - Przejść ścieżkę nowego użytkownika: instalacja template'u, wygenerowanie
+     nowej nazwy, lokalna konfiguracja, uruchomienie, testy i pierwsza zmiana
+     domenowa.
+   - Dodać krótkie runbooki: lokalny start, aktualizacja bazy, odnowienie
+     konfiguracji Entra, diagnozowanie API, backup/restore oraz prywatna
+     instalacja.
+
+**Bramka V4:** świeżo wygenerowana aplikacja buduje się i przechodzi wymagane
+testy niezależnie od checkoutu template'u; jej granice i wymagane ustawienia
+są udokumentowane; żadne niezweryfikowane hosty nie są reklamowane jako
+wspierane; procedury operacyjne dają się wykonać na danych testowych.
+
+### V5 — opcjonalny, małokosztowy pokaz wdrożenia Azure
+
+**Cel:** dodać opcjonalny, dobrze opisany przykład wdrożenia wygenerowanej
+aplikacji, aby nauczyć się IaC, bezpiecznego pipeline'u i eksploatacji, nie
+utrzymując niepotrzebnej infrastruktury przez cały czas. Azure nie jest
+wymaganiem bazowego template'u. Wdrożenie wymaga osobnej akceptacji kosztu.
+
+1. **Bramka kosztu i subskrypcji**
+   - Sprawdzić aktualne uprawnienia, saldo, polityki i limity Azure for Students;
+     nie zakładać, że dowolny SKU lub produkt jest dostępny. Aktualne warunki
+     programu są opisane na stronie
+     [Azure for Students](https://azure.microsoft.com/en-us/free/students/).
+   - Wybrać region UE dopiero po sprawdzeniu dostępności usług i polityk
+     subskrypcji.
+   - Przygotować miesięczny szacunek i limit wydatków. Nie tworzyć zasobów,
+     dopóki użytkownik nie zaakceptuje szacunku. Każdy etap ma instrukcję
+     weryfikacji kosztów i ręcznego usunięcia zasobów.
+
+2. **Prosta architektura, bez przedwczesnego skalowania**
+   - Kandydat do oceny: jeden Azure App Service dla obecnego hosta ASP.NET
+     Core Web/API i Azure Database for PostgreSQL Flexible Server.
+     Zachować jeden proces Web/API, dopóki niezależne skalowanie lub granica
+     bezpieczeństwa nie uzasadni rozdzielenia.
+   - Porównać koszt i wymagania sieciowe przed wyborem SKU, publicznego lub
+     prywatnego dostępu do bazy i dodatkowych usług.
+   - Użyć AZD + Bicep jako preferowanej ścieżki edukacyjnej Azure, pod
+     warunkiem potwierdzenia, że najprostszy wygenerowany IaC odpowiada
+     wybranej usłudze i politykom.
+   - Używać Managed Identity i najmniejszych wymaganych uprawnień, gdzie
+     usługi to obsługują. Sekret klienta OIDC przechowywać poza repozytorium i
+     klientami; ocenić Key Vault oraz rotację. Nie wstawiać haseł do kodu,
+     obrazów, logów ani parametrów template'u.
+   - Utrzymać konfigurację Azure poza domyślną zawartością każdego
+     wygenerowanego projektu, chyba że później powstanie świadomie wybrany
+     Azure-specific wariant template'u.
+
+3. **Bezpieczne dostarczanie i migracje**
+   - Wdrażać przez GitHub Actions z krótkotrwałym OIDC do Azure, bez
+     długowiecznych kluczy w repozytorium.
+   - Rozdzielić walidację IaC, build/test, migrację bazy i wdrożenie aplikacji;
+     migrację uruchamiać jawnie i sprawdzać przed przełączeniem ruchu.
+   - Używać HTTPS, właściwych redirect URI dla hostingu, jawnych hostów oraz
+     ograniczonych uprawnień i zatwierdzeń środowiska.
+
+4. **Operacje i test wdrożenia**
+   - Dodać tylko uzasadnioną, mierzoną telemetrię, health checks, alert kosztów,
+     retencję logów oraz procedury diagnozy i rollbacku.
+   - Skonfigurować kopię bazy i przetestować restore. Ustalić, jak zachowują
+     się dane po wyłączeniu lub usunięciu demonstracyjnego środowiska.
+   - Wykonać smoke HTTPS z testowym kontem, w tym Web i prywatny klient MAUI;
+     nie używać danych osobowych.
+   - Zacząć od pojedynczej instancji i jawnie opisać brak HA/SLA. Przed
+     skalowaniem zaprojektować rozproszony rate limiter, współdzielone klucze
+     Data Protection i zachowanie Interactive Server/SignalR.
+
+**Bramka V5:** środowisko da się odtworzyć z IaC, pipeline nie wymaga
+długowiecznych sekretów, live smoke przechodzi, restore zostało sprawdzone,
+koszt i procedura teardown są znane, a ograniczenia pojedynczej instancji są
+udokumentowane. Nie jest to automatyczna deklaracja produkcyjności.
+
+### V6 — uruchomienie konkretnej aplikacji dla użytkowników
+
+Tę fazę rozpoczynać dopiero dla rzeczywistego produktu. Najpierw ustalić
+klasyfikację danych, prywatność/GDPR, wymagania dostępności, RPO/RTO, SLA,
+region, liczbę użytkowników, dystrybucję aplikacji i budżet. Następnie dobrać
+odpowiednie skalowanie, HA/DR, sieć, alerty, proces incydentów, retencję i
+politykę wydań. Nie kopiować ustawień portfolio demo do środowiska klienta bez
+ponownej oceny ryzyka.
+
+### Zasady pracy z AI przy realizacji roadmapy
+
+- Dzielić fazy na małe, samodzielne zadania z opisem celu, plików, kryteriów
+  akceptacji i komend weryfikacji; każda zmiana ma test lub jawne uzasadnienie,
+  dlaczego test jest ręczny.
+- AI ma przed zmianą wyjaśnić obecny przepływ i granice, po zmianie podać
+  kompromisy, ścieżki błędów i wyniki testów. Użytkownik ćwiczy weryfikację i
+  podejmowanie decyzji, a nie tylko akceptowanie wygenerowanego kodu.
+- Nie wklejać sekretów, tokenów ani produkcyjnych danych do rozmowy. Nie
+  wykonywać wdrożeń, operacji płatnych, zmian RBAC ani destrukcyjnego teardown
+  bez osobnej zgody użytkownika.
+- Po każdym etapie aktualizować ADR/runbook i status dowodów. „Build passed”
+  nie oznacza „runtime smoke passed”, a „deployed” nie oznacza „operacyjnie
+  gotowe”.
+- Kryterium każdej zmiany template'u sprawdzać na świeżo wygenerowanym
+  projekcie, nie tylko na source solution.
 
 ## Cel
 
