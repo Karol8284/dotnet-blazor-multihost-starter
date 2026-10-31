@@ -149,7 +149,7 @@ docker cp starter-postgres:/tmp/backup.dump ./backup-$(date +%Y%m%d%H%M%S).dump
 1. In the Microsoft Entra admin center, navigate to **App registrations** > Web / Confidential Client.
 2. Under **Certificates & secrets**, add a new client secret. Note the expiration date.
 3. Update the deployment environment variable or secret store:
-   `Authentication__Entra__ServerClientSecret="<new_secret>"`
+   `Authentication:Entra:ServerClientSecret="<new_secret>"`
 4. Verify Interactive Server sign-in at `http://localhost:5080/signin-oidc`.
 5. In Entra admin center, delete the old secret after zero traffic uses it.
 
