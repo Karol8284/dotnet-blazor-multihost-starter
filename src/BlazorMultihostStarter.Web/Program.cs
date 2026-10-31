@@ -4,6 +4,7 @@ using BlazorMultihostStarter.Client.Authentication;
 using BlazorMultihostStarter.Client.Tasks;
 using BlazorMultihostStarter.Infrastructure;
 using BlazorMultihostStarter.Shared.Tasks;
+using BlazorMultihostStarter.Shared.UI;
 using BlazorMultihostStarter.Web.Modules.Tasks;
 using BlazorMultihostStarter.Web.Configuration;
 using BlazorMultihostStarter.Web.Diagnostics;
@@ -28,6 +29,7 @@ var serverAuthenticationConfigured = EntraServerAuthentication.IsConfigured(
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
+builder.Services.AddSharedUiServices();
 builder.Services.AddOpenApi();
 builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();

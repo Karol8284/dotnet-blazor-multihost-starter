@@ -1,0 +1,21 @@
+@namespace BlazorMultihostStarter.Shared.UI.Navigation
+@inject NavigationManager Navigation
+
+<nav class="bottom-nav" aria-label="Mobile primary navigation">
+    <NavLink class="bottom-nav-item" href="dashboard" Match="NavLinkMatch.Prefix">
+        <span class="bottom-nav-icon" aria-hidden="true">&#9638;</span>
+        <span class="bottom-nav-text">Home</span>
+    </NavLink>
+    <NavLink class="bottom-nav-item" href="" Match="NavLinkMatch.All">
+        <span class="bottom-nav-icon" aria-hidden="true">&#9776;</span>
+        <span class="bottom-nav-text">Server</span>
+    </NavLink>
+    <NavLink class="bottom-nav-item" href="tasks/local" Match="NavLinkMatch.Prefix">
+        <span class="bottom-nav-icon" aria-hidden="true">&#9881;</span>
+        <span class="bottom-nav-text">Local</span>
+    </NavLink>
+    <NavLink class="bottom-nav-item" href="tasks/offline" Match="NavLinkMatch.Prefix">
+        <span class="bottom-nav-icon" aria-hidden="true">&#8646;</span>
+        <span class="bottom-nav-text">Offline</span>
+    </NavLink>
+</nav>

@@ -5,6 +5,7 @@ using BlazorMultihostStarter.Client;
 using BlazorMultihostStarter.Client.Tasks;
 using BlazorMultihostStarter.Web.Client.Services;
 using BlazorMultihostStarter.Shared.Tasks;
+using BlazorMultihostStarter.Shared.UI;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
@@ -42,6 +43,7 @@ else
     entraOptions.Validate();
 }
 
+builder.Services.AddSharedUiServices();
 builder.Services.AddSharedTaskModes();
 
 await builder.Build().RunAsync();

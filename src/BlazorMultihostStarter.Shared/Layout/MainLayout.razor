@@ -4,6 +4,7 @@
     <header class="app-header">
         <a class="brand" href="/">Blazor Multihost Starter</a>
         <nav class="mode-nav" aria-label="Task data modes">
+            <a href="/dashboard">Dashboard</a>
             <a href="/">Server-centric</a>
             <a href="/tasks/local">Client-local</a>
             <a href="/tasks/offline">Offline hybrid</a>
@@ -18,7 +19,12 @@
     <footer class="app-footer">
         One shared Razor UI. Choose the data mode that fits the feature.
     </footer>
+
+    <BottomNav />
 </div>
+
+<ToastContainer />
+<DialogContainer />
 
 <div id="blazor-error-ui" data-nosnippet>
     The UI encountered an unexpected error.

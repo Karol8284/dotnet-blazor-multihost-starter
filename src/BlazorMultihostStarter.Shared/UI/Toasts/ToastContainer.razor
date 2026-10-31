@@ -1,0 +1,42 @@
+@namespace BlazorMultihostStarter.Shared.UI.Toasts
+@implements IDisposable
+@inject IToastService ToastService
+
+@if (ToastService.Toasts.Count > 0)
+{
+    <div class="toast-container" role="region" aria-label="Notifications" aria-live="polite">
+        @foreach (var toast in ToastService.Toasts)
+        {
+            <div class="toast-card toast-@toast.Type.ToString().ToLowerInvariant()" role="alert">
+                <div class="toast-indicator" aria-hidden="true"></div>
+                <div class="toast-body">
+                    @if (!string.IsNullOrWhiteSpace(toast.Title))
+                    {
+                        <strong class="toast-title">@toast.Title</strong>
+                    }
+                    <span class="toast-message">@toast.Message</span>
+                </div>
+                <button type="button" class="toast-close" @onclick="() => ToastService.Dismiss(toast.Id)" aria-label="Close notification">
+                    &times;
+                </button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        ToastService.OnChanged += HandleChanged;
+    }
+
+    private void HandleChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ToastService.OnChanged -= HandleChanged;
+    }
+}
