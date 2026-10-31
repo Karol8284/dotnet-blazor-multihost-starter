@@ -13,6 +13,13 @@
   "sourceName": "BlazorMultihostStarter",
   "preferNameDirectory": true,
   "symbols": {
+    "projectName": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "identity",
+      "replaces": "__PROJECT_NAME__",
+      "description": "Original project name used in project-reference paths."
+    },
     "appTitle": {
       "type": "parameter",
       "datatype": "text",
@@ -75,6 +82,9 @@
   },
   "sources": [
     {
+      "rename": {
+        "src/BlazorMultihostStarter.Maui/BlazorMultihostStarter.Maui.csproj": "src/BlazorMultihostStarter.Maui/BlazorMultihostStarter.csproj"
+      },
       "modifiers": [
         {
           "exclude": [
@@ -83,12 +93,18 @@
             "**/.git/**",
             "**/.template.config/**",
             "artifacts/**",
+            "BlazorMultihostStarter.sln",
+            "template-files/**",
             "**/TestResults/**",
             "**/*.user",
             "**/*.suo"
           ]
         }
       ]
+    },
+    {
+      "source": "template-files",
+      "target": "./"
     }
   ]
 }

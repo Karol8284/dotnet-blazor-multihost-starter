@@ -12,6 +12,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableDefaultCssItems>false</EnableDefaultCssItems>
     <Nullable>enable</Nullable>
+    <AssemblyName>$(StarterSafeProjectName)</AssemblyName>
 
     <!-- Display name -->
     <ApplicationTitle>Blazor Multihost Starter</ApplicationTitle>
@@ -64,8 +65,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\BlazorMultihostStarter.Shared\BlazorMultihostStarter.Shared.csproj" />
-    <ProjectReference Include="..\BlazorMultihostStarter.Client\BlazorMultihostStarter.Client.csproj" />
+    <ProjectReference Include="..\$(StarterProjectName).Shared\$(StarterProjectName).Shared.csproj" />
+    <ProjectReference Include="..\$(StarterProjectName).Client\$(StarterProjectName).Client.csproj" />
   </ItemGroup>
 
 </Project>

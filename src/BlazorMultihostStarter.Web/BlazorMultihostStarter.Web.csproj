@@ -4,15 +4,16 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>$(StarterSafeProjectName).Web</AssemblyName>
     <UserSecretsId>__WEB_USER_SECRETS_ID__</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\BlazorMultihostStarter.Web.Client\BlazorMultihostStarter.Web.Client.csproj" />
-    <ProjectReference Include="..\BlazorMultihostStarter.Shared\BlazorMultihostStarter.Shared.csproj" />
-    <ProjectReference Include="..\BlazorMultihostStarter.Application\BlazorMultihostStarter.Application.csproj" />
-    <ProjectReference Include="..\BlazorMultihostStarter.Contracts\BlazorMultihostStarter.Contracts.csproj" />
-    <ProjectReference Include="..\BlazorMultihostStarter.Infrastructure\BlazorMultihostStarter.Infrastructure.csproj" />
+    <ProjectReference Include="..\$(StarterProjectName).Web.Client\$(StarterProjectName).Web.Client.csproj" />
+    <ProjectReference Include="..\$(StarterProjectName).Shared\$(StarterProjectName).Shared.csproj" />
+    <ProjectReference Include="..\$(StarterProjectName).Application\$(StarterProjectName).Application.csproj" />
+    <ProjectReference Include="..\$(StarterProjectName).Contracts\$(StarterProjectName).Contracts.csproj" />
+    <ProjectReference Include="..\$(StarterProjectName).Infrastructure\$(StarterProjectName).Infrastructure.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">

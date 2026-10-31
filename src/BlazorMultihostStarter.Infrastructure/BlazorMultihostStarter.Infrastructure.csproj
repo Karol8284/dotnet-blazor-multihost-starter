@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\BlazorMultihostStarter.Application\BlazorMultihostStarter.Application.csproj" />
-    <ProjectReference Include="..\BlazorMultihostStarter.Domain\BlazorMultihostStarter.Domain.csproj" />
+    <ProjectReference Include="..\$(StarterProjectName).Application\$(StarterProjectName).Application.csproj" />
+    <ProjectReference Include="..\$(StarterProjectName).Domain\$(StarterProjectName).Domain.csproj" />
   </ItemGroup>
 </Project>

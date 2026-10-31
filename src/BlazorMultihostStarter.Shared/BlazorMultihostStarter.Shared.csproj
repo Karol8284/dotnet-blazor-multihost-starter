@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>$(StarterSafeProjectName).Shared</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,8 +14,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\BlazorMultihostStarter.Client\BlazorMultihostStarter.Client.csproj" />
-    <ProjectReference Include="..\BlazorMultihostStarter.Contracts\BlazorMultihostStarter.Contracts.csproj" />
+    <ProjectReference Include="..\$(StarterProjectName).Client\$(StarterProjectName).Client.csproj" />
+    <ProjectReference Include="..\$(StarterProjectName).Contracts\$(StarterProjectName).Contracts.csproj" />
   </ItemGroup>
 
 </Project>

@@ -2,5 +2,8 @@
   <PropertyGroup>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <StarterProjectDirectoryName>$([System.IO.Path]::GetFileName('$(MSBuildProjectDirectory)'))</StarterProjectDirectoryName>
+    <StarterProjectName>$([System.Text.RegularExpressions.Regex]::Replace('$(StarterProjectDirectoryName)', '\.(Web\.Client|Api\.IntegrationTests|Application\.Tests|Domain\.Tests|Shared\.Tests|Infrastructure|Application|Contracts|Domain|Client|Shared|Maui|Web)$', ''))</StarterProjectName>
+    <StarterSafeProjectName>$([System.Text.RegularExpressions.Regex]::Replace('$(StarterProjectName)', '[^A-Za-z0-9.]', '_'))</StarterSafeProjectName>
   </PropertyGroup>
 </Project>
