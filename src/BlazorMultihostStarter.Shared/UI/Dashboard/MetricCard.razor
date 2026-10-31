@@ -1,0 +1,33 @@
+@namespace BlazorMultihostStarter.Shared.UI.Dashboard
+
+<div class="metric-card @CssClass">
+    <div class="metric-header">
+        <span class="metric-label">@Label</span>
+        @if (!string.IsNullOrEmpty(Icon))
+        {
+            <span class="metric-icon" aria-hidden="true">@Icon</span>
+        }
+    </div>
+    <div class="metric-value">@Value</div>
+    @if (!string.IsNullOrEmpty(Description))
+    {
+        <div class="metric-description">@Description</div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Description { get; set; }
+
+    [Parameter]
+    public string? Icon { get; set; }
+
+    [Parameter]
+    public string? CssClass { get; set; }
+}

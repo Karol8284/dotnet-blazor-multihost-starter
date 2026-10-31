@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "showcase"
+    },
+    "dbAdminUser": {
+      "value": "starter_admin"
+    },
+    "entraTenantId": {
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    "entraApiClientId": {
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    "entraWebClientId": {
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    "entraMauiClientId": {
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    "webInteractivity": {
+      "value": "WebAssembly"
+    },
+    "appServiceSku": {
+      "value": "B1"
+    },
+    "postgresSku": {
+      "value": "Standard_B1ms"
+    }
+  }
+}
