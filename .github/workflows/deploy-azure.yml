@@ -1,0 +1,123 @@
+name: Deploy to Azure Showcase (V5)
+
+on:
+  workflow_dispatch:
+    inputs:
+      azure_resource_group:
+        description: "Azure Resource Group name"
+        required: true
+        default: "rg-blazor-multihost-showcase"
+      azure_region:
+        description: "Azure Region (e.g. polandcentral, westeurope, northeurope)"
+        required: true
+        default: "polandcentral"
+      environment_name:
+        description: "Environment prefix"
+        required: true
+        default: "showcase"
+      web_interactivity:
+        description: "Web Interactivity mode (WebAssembly or Server)"
+        required: true
+        default: "WebAssembly"
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: azure-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-and-deploy:
+    name: Provision & Deploy to Azure
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.402
+
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create or Verify Resource Group
+        run: |
+          az group create \
+            --name "${{ github.event.inputs.azure_resource_group }}" \
+            --location "${{ github.event.inputs.azure_region }}"
+
+      - name: Deploy Infrastructure (Bicep)
+        id: bicep_deploy
+        run: |
+          DEPLOY_OUTPUT=$(az deployment group create \
+            --resource-group "${{ github.event.inputs.azure_resource_group }}" \
+            --template-file ./infra/main.bicep \
+            --parameters \
+              environmentName="${{ github.event.inputs.environment_name }}" \
+              location="${{ github.event.inputs.azure_region }}" \
+              dbAdminPassword="${{ secrets.AZURE_POSTGRES_PASSWORD }}" \
+              entraTenantId="${{ secrets.ENTRA_TENANT_ID }}" \
+              entraApiClientId="${{ secrets.ENTRA_API_CLIENT_ID }}" \
+              entraWebClientId="${{ secrets.ENTRA_WEB_CLIENT_ID }}" \
+              entraMauiClientId="${{ secrets.ENTRA_MAUI_CLIENT_ID }}" \
+              webInteractivity="${{ github.event.inputs.web_interactivity }}" \
+            --query "properties.outputs" \
+            --output json)
+
+          APP_NAME=$(echo "$DEPLOY_OUTPUT" | jq -r '.appServiceName.value')
+          APP_URL=$(echo "$DEPLOY_OUTPUT" | jq -r '.appServiceUrl.value')
+          PG_FQDN=$(echo "$DEPLOY_OUTPUT" | jq -r '.postgresServerFqdn.value')
+
+          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
+          echo "app_url=$APP_URL" >> $GITHUB_OUTPUT
+          echo "pg_fqdn=$PG_FQDN" >> $GITHUB_OUTPUT
+
+      - name: Restore EF tools & generate idempotent migration script
+        run: |
+          dotnet tool restore
+          dotnet ef migrations script --idempotent \
+            --project src/BlazorMultihostStarter.Infrastructure/BlazorMultihostStarter.Infrastructure.csproj \
+            --startup-project src/BlazorMultihostStarter.Web/BlazorMultihostStarter.Web.csproj \
+            --context BlazorMultihostStarter.Infrastructure.Data.StarterDbContext \
+            --output ./migration.sql
+
+      - name: Apply EF Core migrations to PostgreSQL
+        env:
+          PGPASSWORD: ${{ secrets.AZURE_POSTGRES_PASSWORD }}
+          PGHOST: ${{ steps.bicep_deploy.outputs.pg_fqdn }}
+          PGUSER: starter_admin
+          PGDATABASE: starter_db
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          psql -h "$PGHOST" -U "$PGUSER" -d "$PGDATABASE" -f ./migration.sql
+
+      - name: Publish Web application
+        run: |
+          dotnet publish src/BlazorMultihostStarter.Web/BlazorMultihostStarter.Web.csproj \
+            --configuration Release \
+            --output ./publish
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ steps.bicep_deploy.outputs.app_name }}
+          package: ./publish
+
+      - name: Verify Health Probes (Live & Ready)
+        run: |
+          echo "Waiting 15 seconds for application warmup..."
+          sleep 15
+          echo "Checking liveness probe (/healthz)..."
+          curl -f -i "${{ steps.bicep_deploy.outputs.app_url }}/healthz"
+          echo "Checking readiness probe (/health/ready)..."
+          curl -f -i "${{ steps.bicep_deploy.outputs.app_url }}/health/ready"
+          echo "Deployment successful! App is live at: ${{ steps.bicep_deploy.outputs.app_url }}"
