@@ -18,19 +18,11 @@ public sealed class DevelopmentLocalModeTests
             {
                 builder.UseEnvironment("Development");
                 builder.UseSetting("Web:Interactivity", webInteractivity);
-                builder.ConfigureAppConfiguration((_, configuration) =>
-                {
-                    configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                    {
-                        ["Authentication:Entra:TenantId"] = "__TENANT_ID__",
-                        ["Authentication:Entra:ApiClientId"] = "__API_CLIENT_ID__",
-                        ["Authentication:Entra:WebClientId"] = "__WEB_CLIENT_ID__",
-                        ["Authentication:Entra:MauiClientId"] = "__MAUI_CLIENT_ID__",
-                        ["Authentication:Entra:ApiScopeName"] = "Tasks.ReadWrite",
-                        ["ConnectionStrings:DefaultConnection"] = "",
-                        ["Web:Interactivity"] = webInteractivity
-                    });
-                });
+                builder.UseSetting("Authentication:Entra:TenantId", string.Empty);
+                builder.UseSetting("Authentication:Entra:ApiClientId", string.Empty);
+                builder.UseSetting("Authentication:Entra:WebClientId", string.Empty);
+                builder.UseSetting("Authentication:Entra:MauiClientId", string.Empty);
+                builder.UseSetting("ConnectionStrings:DefaultConnection", string.Empty);
             });
         using var client = factory.CreateClient();
 
