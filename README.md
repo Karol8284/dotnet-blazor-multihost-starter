@@ -252,8 +252,11 @@ broker flows.
 - [Architecture](./docs/ARCHITECTURE.md) — projects, responsibilities, and dependency direction.
 - [Adding a feature](./docs/ADDING_FEATURES.md) — the Tasks VSA golden path and test checklist.
 - [Getting started](./docs/GETTING_STARTED.md) — local database, API URL, and MAUI targets.
+- [Operations and runbooks](./docs/OPERATIONS.md) — runbooks for development, migrations, backup/restore, and health monitoring.
+- [Azure showcase and deployment guide](./docs/AZURE_SHOWCASE.md) — IaC (Bicep), cost estimate, and GitHub Actions workflow for V5.
 - [Roadmap](./ROADMAP.md) — current status, verification boundaries, and follow-up work.
 - [ADR-0003](./docs/adr/0003-data-modes-and-offline-conflicts.md) — client-local and offline sync semantics.
+- [ADR-0004](./docs/adr/0004-template-boundaries-and-baseline-architecture.md) — template boundaries and baseline architecture.
 
 This starter borrows architectural practices from
 [dotnet-react-starter](https://github.com/Karol-Malecki-dev/dotnet-react-starter);

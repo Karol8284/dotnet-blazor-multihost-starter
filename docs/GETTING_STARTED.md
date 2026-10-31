@@ -183,6 +183,76 @@ Release build rejects a non-HTTPS API URL and keeps cleartext disabled.
 Physical devices need a reachable development-machine address and firewall
 access. MAUI sign-in uses MSAL and the platform broker/system browser.
 
+## Manual authenticated smoke test
+
+Run this acceptance check with a dedicated Entra test account and a disposable
+PostgreSQL database, after completing the Entra configuration and migration
+steps above. Use the same account and database for every host. Keep the server
+client secret and any real database credential in User Secrets or a secret
+manager; never put credentials or access tokens in source control, screenshots,
+logs, or chat.
+
+The automated tests below use a test-only identity handler. They do not prove
+real Entra sign-in, OIDC/MSAL redirects, or platform broker behavior.
+
+### Server-centric flow
+
+For each row, sign in as the same test user, create a task with a unique title,
+reload the page, and mark the task complete. Confirm the change from another
+host after refreshing its task list.
+
+| Host | Configuration and expected authentication |
+|---|---|
+| WebAssembly | Set `Web:Interactivity` to `WebAssembly`; register `http://localhost:5080/authentication/login-callback`; verify MSAL sign-in, protected API list/create/complete, and sign-out. |
+| Interactive Server | Set `Web:Interactivity` to `Server`; configure the confidential Web client and `http://localhost:5080/signin-oidc`; verify OIDC/cookie sign-in and task reads/writes. |
+| MAUI Windows | Run the Windows target below; verify the Windows broker callback and protected API access. |
+| Android emulator | Run the Android target below; verify the MAUI redirect and broker flow. The API address must be reachable at `http://10.0.2.2:5080` from the emulator. |
+
+Use the shared `/` Tasks page for this check, not `/tasks/local`, which stores
+data only in the current browser or WebView. Create a task in Web, confirm it
+appears in MAUI, complete it in MAUI, and confirm the completed state in Web.
+Repeat the Web check with both rendering modes. Restart the Web host after
+changing `Web:Interactivity`.
+
+Run MAUI Windows with:
+
+```powershell
+dotnet run --project .\src\BlazorMultihostStarter.Maui `
+  --framework net10.0-windows10.0.19041.0
+```
+
+Run the Android emulator target with:
+
+```powershell
+dotnet build .\src\BlazorMultihostStarter.Maui `
+  --framework net10.0-android `
+  -t:Run
+```
+
+For at least one create/complete operation in each UI, use real pointer or
+touch input; also submit a task with the keyboard (Enter) in each Web rendering
+mode. Do not invoke a DOM `button.click()` as a substitute for user input.
+
+### Offline queue
+
+Open `/tasks/offline`, save a uniquely named task, and confirm it is marked
+`Pending`. Sign in, select **Sync pending**, and confirm the task becomes
+`Synced` and appears on the server-centric `/` page. This verifies the live
+authenticated upload path and local queue persistence.
+
+A live stale-version `409` is not part of this smoke check: the normal offline
+UI does not import an existing server task into a second independent local
+queue, so two devices do not automatically hold the same base snapshot. The
+Shared tests cover both **Keep server** and **Keep local and retry**; API
+integration tests verify the stale-version `409` response and server snapshot.
+Use those tests for conflict behavior unless a separate snapshot-seeding test
+workflow is designed.
+
+Record pass/fail by host and scenario without including account identifiers,
+secrets, or tokens. The roadmap tracks which runtime/platform has actually
+passed; a build or test-only identity handler is not a live authentication
+result.
+
 ## Run tests
 
 ```powershell
