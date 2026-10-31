@@ -4,7 +4,7 @@ public interface IToastService
 {
     event Action? OnChanged;
 
-    IReadOnlyList<ToastMessage> Toasts { get; }
+    IReadOnlyList<ToastMessage> GetToasts();
 
     void Show(string message, ToastType type = ToastType.Info, string? title = null, TimeSpan? duration = null);
 

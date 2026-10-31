@@ -13,14 +13,11 @@ public sealed class ToastService : IToastService, IDisposable
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
-    public IReadOnlyList<ToastMessage> Toasts
+    public IReadOnlyList<ToastMessage> GetToasts()
     {
-        get
+        lock (_lock)
         {
-            lock (_lock)
-            {
-                return _toasts.ToList();
-            }
+            return _toasts.ToList();
         }
     }
 

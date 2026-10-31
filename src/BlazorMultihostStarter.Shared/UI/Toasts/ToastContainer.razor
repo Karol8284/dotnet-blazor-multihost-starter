@@ -2,10 +2,10 @@
 @implements IDisposable
 @inject IToastService ToastService
 
-@if (ToastService.Toasts.Count > 0)
+@if (ToastService.GetToasts() is { Count: > 0 } toasts)
 {
     <div class="toast-container" role="region" aria-label="Notifications" aria-live="polite">
-        @foreach (var toast in ToastService.Toasts)
+        @foreach (var toast in toasts)
         {
             <div class="toast-card toast-@toast.Type.ToString().ToLowerInvariant()" role="alert">
                 <div class="toast-indicator" aria-hidden="true"></div>

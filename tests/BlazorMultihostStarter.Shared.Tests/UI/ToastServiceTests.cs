@@ -14,8 +14,8 @@ public sealed class ToastServiceTests
         service.ShowSuccess("Operation succeeded", "Done");
 
         Assert.True(changedFired);
-        Assert.Single(service.Toasts);
-        var toast = service.Toasts[0];
+        Assert.Single(service.GetToasts());
+        var toast = service.GetToasts()[0];
         Assert.Equal("Operation succeeded", toast.Message);
         Assert.Equal("Done", toast.Title);
         Assert.Equal(ToastType.Success, toast.Type);
@@ -31,11 +31,12 @@ public sealed class ToastServiceTests
         service.ShowWarning("Warning msg");
         service.ShowInfo("Info msg");
 
-        Assert.Equal(4, service.Toasts.Count);
-        Assert.Equal(ToastType.Success, service.Toasts[0].Type);
-        Assert.Equal(ToastType.Error, service.Toasts[1].Type);
-        Assert.Equal(ToastType.Warning, service.Toasts[2].Type);
-        Assert.Equal(ToastType.Info, service.Toasts[3].Type);
+        var toasts = service.GetToasts();
+        Assert.Equal(4, toasts.Count);
+        Assert.Equal(ToastType.Success, toasts[0].Type);
+        Assert.Equal(ToastType.Error, toasts[1].Type);
+        Assert.Equal(ToastType.Warning, toasts[2].Type);
+        Assert.Equal(ToastType.Info, toasts[3].Type);
     }
 
     [Fact]
@@ -43,14 +44,14 @@ public sealed class ToastServiceTests
     {
         var service = new ToastService();
         service.ShowInfo("Item to dismiss");
-        var id = service.Toasts[0].Id;
+        var id = service.GetToasts()[0].Id;
 
         var changedCount = 0;
         service.OnChanged += () => changedCount++;
 
         service.Dismiss(id);
 
-        Assert.Empty(service.Toasts);
+        Assert.Empty(service.GetToasts());
         Assert.Equal(1, changedCount);
     }
 
@@ -60,11 +61,11 @@ public sealed class ToastServiceTests
         var service = new ToastService();
         service.ShowInfo("1");
         service.ShowInfo("2");
-        Assert.Equal(2, service.Toasts.Count);
+        Assert.Equal(2, service.GetToasts().Count);
 
         service.Clear();
 
-        Assert.Empty(service.Toasts);
+        Assert.Empty(service.GetToasts());
     }
 
     [Fact]

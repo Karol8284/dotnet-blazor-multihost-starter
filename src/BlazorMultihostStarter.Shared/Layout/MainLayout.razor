@@ -1,6 +1,9 @@
 ﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject IThemeService ThemeService
+@inject ICommandPaletteService PaletteService
 
-<div class="app-shell">
+<div class="app-shell" data-theme="@(ThemeService.IsDarkMode ? "dark" : "light")">
     <header class="app-header">
         <a class="brand" href="/">Blazor Multihost Starter</a>
         <nav class="mode-nav" aria-label="Task data modes">
@@ -9,7 +12,14 @@
             <a href="/tasks/local">Client-local</a>
             <a href="/tasks/offline">Offline hybrid</a>
         </nav>
-        <span class="host-label">Web · MAUI</span>
+        <div class="header-actions">
+            <button type="button" class="command-palette-trigger" @onclick="() => PaletteService.Open()" title="Open Command Palette (Ctrl+K)" aria-label="Open Command Palette">
+                <span class="cmd-icon" aria-hidden="true">&#8984;</span>
+                <kbd class="cmd-badge">Ctrl+K</kbd>
+            </button>
+            <ThemeToggle />
+            <span class="host-label">Web · MAUI</span>
+        </div>
     </header>
 
     <main class="app-main">
@@ -25,9 +35,27 @@
 
 <ToastContainer />
 <DialogContainer />
+<CommandPalette />
 
 <div id="blazor-error-ui" data-nosnippet>
     The UI encountered an unexpected error.
     <a href="." class="reload">Reload</a>
     <span class="dismiss">Dismiss</span>
 </div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        ThemeService.OnChanged += HandleThemeChanged;
+    }
+
+    private void HandleThemeChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ThemeService.OnChanged -= HandleThemeChanged;
+    }
+}

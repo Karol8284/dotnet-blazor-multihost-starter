@@ -106,8 +106,8 @@ public sealed class UIComponentTests
         var toastButton = cut.Find("button.btn-primary");
         toastButton.Click();
 
-        Assert.Single(toastService.Toasts);
-        Assert.Equal(ToastType.Success, toastService.Toasts[0].Type);
+        Assert.Single(toastService.GetToasts());
+        Assert.Equal(ToastType.Success, toastService.GetToasts()[0].Type);
     }
 
     [Fact]
