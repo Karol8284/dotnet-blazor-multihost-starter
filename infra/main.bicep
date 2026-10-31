@@ -72,8 +72,6 @@ module database 'modules/database.bicep' = {
   }
 }
 
-var connectionString = 'Host=${database.outputs.serverFullyQualifiedDomainName};Port=5432;Database=${database.outputs.databaseName};Username=${dbAdminUser};Password=${dbAdminPassword};SSL Mode=Require;Trust Server Certificate=true'
-
 module appService 'modules/appservice.bicep' = {
   name: 'appServiceDeployment'
   params: {
@@ -82,7 +80,7 @@ module appService 'modules/appservice.bicep' = {
     appServicePlanName: appServicePlanName
     skuName: appServiceSku
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
-    defaultConnectionString: connectionString
+    defaultConnectionString: 'Host=${database.outputs.serverFullyQualifiedDomainName};Port=5432;Database=${database.outputs.databaseName};Username=${dbAdminUser};Password=${dbAdminPassword};SSL Mode=Require;Trust Server Certificate=true'
     entraTenantId: entraTenantId
     entraApiClientId: entraApiClientId
     entraWebClientId: entraWebClientId

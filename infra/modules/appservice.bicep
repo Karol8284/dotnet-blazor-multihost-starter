@@ -49,13 +49,13 @@ param webInteractivity string = 'WebAssembly'
 resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: appServicePlanName
   location: location
-  kind: 'linux'
-  properties: {
-    reserved: true
-  }
   sku: {
     name: skuName
     tier: skuTier
+  }
+  kind: 'linux'
+  properties: {
+    reserved: true
   }
 }
 
