@@ -4,12 +4,16 @@ using BlazorMultihostStarter.Client.Authentication;
 using BlazorMultihostStarter.Client.Tasks;
 using BlazorMultihostStarter.Infrastructure;
 using BlazorMultihostStarter.Shared.Tasks;
+using BlazorMultihostStarter.Shared.UI;
 using BlazorMultihostStarter.Web.Modules.Tasks;
 using BlazorMultihostStarter.Web.Configuration;
+using BlazorMultihostStarter.Web.Diagnostics;
 using BlazorMultihostStarter.Web.Security;
 using BlazorMultihostStarter.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -25,9 +29,13 @@ var serverAuthenticationConfigured = EntraServerAuthentication.IsConfigured(
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
+builder.Services.AddSharedUiServices();
 builder.Services.AddOpenApi();
 builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
+builder.Services.AddHealthChecks()
+    .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])
+    .AddCheck<DatabaseHealthCheck>(DatabaseHealthCheck.Name, tags: ["ready"]);
 
 if (!builder.Environment.IsDevelopment())
 {
@@ -155,6 +163,19 @@ if (webInteractivity == WebInteractivity.Server && serverAuthenticationConfigure
 {
     app.MapServerAuthenticationEndpoints();
 }
+
+app.MapHealthChecks("/healthz", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("live")
+});
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("live")
+});
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+});
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()

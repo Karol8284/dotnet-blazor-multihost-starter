@@ -1,0 +1,111 @@
+@namespace BlazorMultihostStarter.Shared.UI.Commands
+@implements IDisposable
+@inject ICommandPaletteService PaletteService
+@inject NavigationManager Navigation
+@inject IThemeService ThemeService
+@inject IToastService ToastService
+
+@if (PaletteService.IsOpen)
+{
+    <div class="palette-backdrop" @onclick="HandleBackdropClick" role="presentation">
+        <div class="palette-card"
+             role="dialog"
+             aria-modal="true"
+             aria-label="Command Palette"
+             @onclick:stopPropagation="true">
+            <div class="palette-search-row">
+                <span class="palette-search-icon" aria-hidden="true">&#128269;</span>
+                <input class="palette-search-input"
+                       @bind="_searchText"
+                       @bind:event="oninput"
+                       placeholder="Type a command or search..."
+                       autofocus />
+                <button type="button" class="palette-close-btn" @onclick="() => PaletteService.Close()" aria-label="Close command palette">
+                    <kbd>Esc</kbd>
+                </button>
+            </div>
+
+            <div class="palette-results">
+                @if (FilteredCommands.Count == 0)
+                {
+                    <div class="palette-empty">No commands match "@_searchText"</div>
+                }
+                else
+                {
+                    @foreach (var group in FilteredCommands.GroupBy(c => c.Category))
+                    {
+                        <div class="palette-group">
+                            <div class="palette-group-header">@group.Key</div>
+                            @foreach (var cmd in group)
+                            {
+                                <button type="button" class="palette-item" @onclick="() => ExecuteCommand(cmd)">
+                                    <span class="palette-item-title">@cmd.Title</span>
+                                    @if (!string.IsNullOrEmpty(cmd.Shortcut))
+                                    {
+                                        <kbd class="palette-shortcut">@cmd.Shortcut</kbd>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string _searchText = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        PaletteService.OnChanged += HandleChanged;
+
+        // Register default platform commands
+        PaletteService.Register(new PaletteCommand("nav-dashboard", "Go to Platform Dashboard", "Navigation", "G D", () => Navigation.NavigateTo("/dashboard")));
+        PaletteService.Register(new PaletteCommand("nav-server", "Go to Server Tasks", "Navigation", "G S", () => Navigation.NavigateTo("/")));
+        PaletteService.Register(new PaletteCommand("nav-local", "Go to Client-Local Tasks", "Navigation", "G L", () => Navigation.NavigateTo("/tasks/local")));
+        PaletteService.Register(new PaletteCommand("nav-offline", "Go to Offline Hybrid Tasks", "Navigation", "G O", () => Navigation.NavigateTo("/tasks/offline")));
+        PaletteService.Register(new PaletteCommand("theme-toggle", "Toggle Dark / Light Mode", "Theme", "T", () => ThemeService.ToggleTheme()));
+        PaletteService.Register(new PaletteCommand("toast-test", "Show Sample Toast", "Actions", null, () => ToastService.ShowInfo("Hello from Command Palette!")));
+    }
+
+    private IReadOnlyList<PaletteCommand> FilteredCommands
+    {
+        get
+        {
+            var commands = PaletteService.GetCommands();
+            if (string.IsNullOrWhiteSpace(_searchText))
+            {
+                return commands;
+            }
+
+            return commands
+                .Where(c => c.Title.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                            c.Category.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+    }
+
+    private void ExecuteCommand(PaletteCommand command)
+    {
+        PaletteService.Close();
+        _searchText = string.Empty;
+        command.Action.Invoke();
+    }
+
+    private void HandleBackdropClick()
+    {
+        PaletteService.Close();
+    }
+
+    private void HandleChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        PaletteService.OnChanged -= HandleChanged;
+    }
+}

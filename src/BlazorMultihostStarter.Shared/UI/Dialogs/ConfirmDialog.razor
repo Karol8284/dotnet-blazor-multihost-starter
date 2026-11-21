@@ -1,0 +1,31 @@
+@namespace BlazorMultihostStarter.Shared.UI.Dialogs
+@inject IDialogService DialogService
+
+<div class="confirm-dialog-content">
+    <p class="confirm-dialog-message">@Message</p>
+    <div class="confirm-dialog-actions">
+        <button type="button" class="btn btn-secondary" @onclick="HandleCancel">@CancelText</button>
+        <button type="button" class="btn btn-primary" @onclick="HandleConfirm">@ConfirmText</button>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Message { get; set; } = string.Empty;
+
+    [Parameter]
+    public string ConfirmText { get; set; } = "Confirm";
+
+    [Parameter]
+    public string CancelText { get; set; } = "Cancel";
+
+    private void HandleConfirm()
+    {
+        DialogService.Close(true);
+    }
+
+    private void HandleCancel()
+    {
+        DialogService.Close(false);
+    }
+}

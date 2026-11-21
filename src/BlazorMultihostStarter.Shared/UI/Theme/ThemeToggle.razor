@@ -1,0 +1,34 @@
+@namespace BlazorMultihostStarter.Shared.UI.Theme
+@implements IDisposable
+@inject IThemeService ThemeService
+
+<button type="button"
+        class="theme-toggle-btn"
+        @onclick="HandleToggle"
+        title="@(ThemeService.IsDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")"
+        aria-label="Toggle dark/light theme">
+    <span class="theme-icon" aria-hidden="true">@(ThemeService.IsDarkMode ? "☀️" : "🌙")</span>
+    <span class="theme-label">@(ThemeService.IsDarkMode ? "Light" : "Dark")</span>
+</button>
+
+@code {
+    protected override void OnInitialized()
+    {
+        ThemeService.OnChanged += HandleChanged;
+    }
+
+    private void HandleToggle()
+    {
+        ThemeService.ToggleTheme();
+    }
+
+    private void HandleChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ThemeService.OnChanged -= HandleChanged;
+    }
+}

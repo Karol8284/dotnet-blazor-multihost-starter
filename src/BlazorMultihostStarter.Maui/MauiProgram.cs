@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Maui.Storage;
 using BlazorMultihostStarter.Shared.Tasks;
+using BlazorMultihostStarter.Shared.UI;
 
 namespace BlazorMultihostStarter;
 
@@ -68,6 +69,7 @@ public static class MauiProgram
                     "The Tasks API is unavailable until valid Entra client IDs are configured."));
         }
 
+        builder.Services.AddSharedUiServices();
         builder.Services.AddSharedTaskModes();
 
         builder.Services.AddMauiBlazorWebView();

@@ -1,0 +1,60 @@
+@namespace BlazorMultihostStarter.Shared.UI.Dashboard
+@inject IToastService ToastService
+@inject IDialogService DialogService
+
+<section class="home-dashboard" aria-label="System Dashboard">
+    <div class="dashboard-header">
+        <h2 class="dashboard-title">Platform Dashboard</h2>
+        <p class="dashboard-subtitle">Reusable UI baseline with built-in dialogs, notifications, and data mode adapters.</p>
+    </div>
+
+    <div class="dashboard-grid">
+        <MetricCard Label="Server Mode" Value="Active" Description="Authoritative PostgreSQL API" Icon="&#9729;" />
+        <MetricCard Label="Client-Local" Value="Ready" Description="IndexedDB zero-latency storage" Icon="&#128190;" />
+        <MetricCard Label="Offline Hybrid" Value="Syncable" Description="Optimistic concurrency queue" Icon="&#8646;" />
+        <MetricCard Label="Security" Value="Entra ID" Description="Token-based fail-closed auth" Icon="&#128274;" />
+    </div>
+
+    <div class="dashboard-actions-card">
+        <h3 class="dashboard-section-title">UI Feature Demonstrator</h3>
+        <p class="dashboard-section-desc">Test the shared dialog and toast notification systems built into this starter:</p>
+        <div class="dashboard-button-group">
+            <button type="button" class="btn btn-primary" @onclick="ShowTestToast">
+                Trigger Toast Notification
+            </button>
+            <button type="button" class="btn btn-secondary" @onclick="ShowTestDialog">
+                Open Confirmation Dialog
+            </button>
+        </div>
+        @if (!string.IsNullOrEmpty(LastDialogResult))
+        {
+            <div class="dashboard-dialog-result" role="status">
+                Dialog response: <strong>@LastDialogResult</strong>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    private string? LastDialogResult;
+
+    private void ShowTestToast()
+    {
+        ToastService.ShowSuccess("Universal toast notification triggered successfully!", "Success");
+    }
+
+    private async Task ShowTestDialog()
+    {
+        var confirmed = await DialogService.ConfirmAsync(
+            "Confirm Operation",
+            "This is a shared Blazor modal dialog rendered on top of the layout. Do you wish to proceed?",
+            "Confirm",
+            "Cancel");
+
+        LastDialogResult = confirmed ? "Confirmed (true)" : "Cancelled (false)";
+        if (confirmed)
+        {
+            ToastService.ShowInfo("Action was confirmed by user.", "Dialog Feedback");
+        }
+    }
+}

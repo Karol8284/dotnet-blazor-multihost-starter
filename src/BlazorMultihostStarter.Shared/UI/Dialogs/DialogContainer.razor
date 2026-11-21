@@ -1,0 +1,50 @@
+@namespace BlazorMultihostStarter.Shared.UI.Dialogs
+@implements IDisposable
+@inject IDialogService DialogService
+
+@if (DialogService.CurrentDialog is { } dialog)
+{
+    <div class="modal-backdrop" @onclick="HandleBackdropClick" tabindex="-1" role="presentation">
+        <div class="modal-card"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="dialog-title"
+             style="max-width: @dialog.Options.MaxWidth"
+             @onclick:stopPropagation="true">
+            <header class="modal-header">
+                <h3 id="dialog-title" class="modal-title">@dialog.Title</h3>
+                <button type="button" class="modal-close" @onclick="() => DialogService.Cancel()" aria-label="Close dialog">
+                    &times;
+                </button>
+            </header>
+            <div class="modal-body">
+                <DynamicComponent Type="@dialog.ComponentType" Parameters="@dialog.Parameters" />
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        DialogService.OnChanged += HandleChanged;
+    }
+
+    private void HandleChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleBackdropClick()
+    {
+        if (DialogService.CurrentDialog?.Options.CloseOnBackdropClick == true)
+        {
+            DialogService.Cancel();
+        }
+    }
+
+    public void Dispose()
+    {
+        DialogService.OnChanged -= HandleChanged;
+    }
+}

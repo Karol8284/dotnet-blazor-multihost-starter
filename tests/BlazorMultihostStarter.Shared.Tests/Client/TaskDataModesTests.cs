@@ -86,6 +86,45 @@ public sealed class TaskDataModesTests
         Assert.Equal(3, synced.BaseVersion);
     }
 
+    [Fact]
+    public async Task Hybrid_conflicts_can_be_resolved_by_keeping_server()
+    {
+        var store = new FakeTasksLocalStore();
+        var server = new FakeTasksClient();
+        var client = new HybridTasksClient(
+            store,
+            server,
+            new FixedTimeProvider(DateTimeOffset.UtcNow));
+        var localTask = await client.CreateAsync("Local title");
+        var serverTask = new TaskResponse(
+            localTask.Id,
+            "Server title",
+            false,
+            localTask.CreatedAtUtc,
+            null,
+            2);
+        server.SyncResult = _ => new TaskSyncResult.Conflict(serverTask);
+
+        var conflictReport = await client.SyncPendingAsync();
+        var conflict = Assert.Single(await client.ListAsync());
+        Assert.Equal(1, conflictReport.ConflictCount);
+        Assert.Equal(LocalTaskSyncState.Conflict, conflict.SyncState);
+        Assert.Equal("Local title", conflict.Task.Title);
+        Assert.Equal("Server title", conflict.ServerTask?.Title);
+
+        await client.ResolveConflictAsync(localTask.Id, keepLocal: false);
+        var resolved = Assert.Single(await client.ListAsync());
+        Assert.Equal(LocalTaskSyncState.Synced, resolved.SyncState);
+        Assert.Equal(2, resolved.BaseVersion);
+        Assert.Equal("Server title", resolved.Task.Title);
+        Assert.Null(resolved.ServerTask);
+
+        var nextReport = await client.SyncPendingAsync();
+        Assert.Equal(0, nextReport.AppliedCount);
+        Assert.Equal(0, nextReport.ConflictCount);
+        Assert.Equal(0, nextReport.MissingCount);
+    }
+
     private sealed class FakeTasksLocalStore : ITasksLocalStore
     {
         private readonly Dictionary<string, List<LocalTaskRecord>> _tasks = [];
